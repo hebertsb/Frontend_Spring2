@@ -32,9 +32,11 @@ interface User {
   estado: string;
   location?: string;
   registrationDate?: string;
-  lastLogin?: string;
-  totalPurchases?: number;
-  rating?: number;
+  telefono?: string;
+  fecha_nacimiento?: string | null;
+  genero?: string;
+  documento_identidad?: string | null;
+  pais?: string;
 }
 
 const roles = ["ADMIN", "OPERADOR", "CLIENTE", "SOPORTE"];
@@ -171,7 +173,7 @@ const AdminDashboard = () => {
   };
 
   // Abrir modal de edición y setear datos
-  const handleOpenEditModal = (user: any) => {
+  const handleOpenEditModal = (user: User) => {
     setEditUser(user);
     setEditForm({
       nombres: user.nombres || user.name || "",

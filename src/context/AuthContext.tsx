@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("refresh", res.data.refresh);
       await reloadUser();
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Limpiar tokens en caso de error de login
       localStorage.removeItem("access");
       localStorage.removeItem("refresh");
@@ -81,20 +81,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Capturar diferentes tipos de errores del backend
       let message = "Credenciales inválidas";
       
-      if (error?.response?.status === 401) {
-        message = "Email o contraseña incorrectos";
-      } else if (error?.response?.status === 403) {
-        message = "Tu cuenta está bloqueada o inactiva";
-      } else if (error?.response?.status === 404) {
-        message = "Usuario no encontrado";
-      } else if (error?.response?.status >= 500) {
-        message = "Error del servidor. Intenta más tarde";
-      } else if (error?.response?.data?.message) {
-        message = error.response.data.message;
-      } else if (error?.response?.data?.detail) {
-        message = error.response.data.detail;
-      } else if (error?.message) {
-        message = error.message;
+      if (typeof error === "object" && error !== null) {
+        const err = error as { response?: { status?: number; data?: { message?: string; detail?: string } }, message?: string };
+        if (err.response?.status === 401) {
+          message = "Email o contraseña incorrectos";
+        } else if (err.response?.status === 403) {
+          message = "Tu cuenta está bloqueada o inactiva";
+        } else if (err.response?.status === 404) {
+          message = "Usuario no encontrado";
+        } else if ((err.response?.status ?? 0) >= 500) {
+          message = "Error del servidor. Intenta más tarde";
+        } else if (err.response?.data?.message) {
+          message = err.response.data.message;
+        } else if (err.response?.data?.detail) {
+          message = err.response.data.detail;
+        } else if (err.message) {
+          message = err.message;
+        }
       }
       
       return { success: false, message };

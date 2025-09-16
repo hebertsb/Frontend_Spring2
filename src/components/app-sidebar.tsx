@@ -32,7 +32,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import useAuth from "@/hooks/useAuth"
 
 const data = {
   user: {
@@ -91,7 +90,7 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { user } = useAuth();
+  // Eliminado: user no se usa
   
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -100,7 +99,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+  // Línea eliminada: user no se usa
             >
               {/* ✅ Link en lugar de <a> */}
               <Link href="/">

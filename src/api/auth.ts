@@ -91,7 +91,7 @@ export const assignRole = async (id: string, rol: string) => {
   return api.post(`/usuarios/${id}/asignar-rol/`, { rol });
 };
 
-export const updateProfile = async (data: any) => {
+export const updateProfile = async (data: UpdateUserData) => {
   return api.put("/usuarios/me/", data);
 };
 

@@ -22,98 +22,11 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-// Mock data de paquetes - esto debería venir del backend
-const paquetesData = [
-  {
-    id: "1",
-    nombre: "Salar de Uyuni 3 Días",
-    ubicacion: "Uyuni, Potosí",
-    descripcionCorta: "Aventura única en el desierto de sal más grande del mundo",
-    precio: "Bs. 1,200",
-    precioOriginal: "Bs. 1,500",
-    duracion: "3 días, 2 noches",
-    maxPersonas: 8,
-    calificacion: 4.8,
-    numeroReseñas: 124,
-    categoria: "Aventura",
-    dificultad: "Moderada",
-    descuento: 20,
-    imagenes: ["/salar-de-uyuni-espejo.png", "/salar-de-uyuni-atardecer.png"],
-    fechaCreacion: "2024-01-15"
-  },
-  {
-    id: "2", 
-    nombre: "Lago Titicaca y Copacabana",
-    ubicacion: "La Paz",
-    descripcionCorta: "Explora el lago navegable más alto del mundo y sus islas sagradas",
-    precio: "Bs. 800",
-    precioOriginal: "",
-    duracion: "2 días, 1 noche",
-    maxPersonas: 12,
-    calificacion: 4.6,
-    numeroReseñas: 89,
-    categoria: "Cultural",
-    dificultad: "Fácil",
-    descuento: 0,
-    imagenes: ["/lago-titicaca-bolivia-panorama.png", "/copacabana-bolivia.png"],
-    fechaCreacion: "2024-02-01"
-  },
-  {
-    id: "3",
-    nombre: "Amazonía Madidi",
-    ubicacion: "Rurrenabaque",
-    descripcionCorta: "Inmersión en la selva amazónica más biodiversa del planeta",
-    precio: "Bs. 2,100",
-    precioOriginal: "Bs. 2,400",
-    duracion: "5 días, 4 noches",
-    maxPersonas: 6,
-    calificacion: 4.9,
-    numeroReseñas: 67,
-    categoria: "Ecoturismo",
-    dificultad: "Avanzada",
-    descuento: 12,
-    imagenes: ["/madidi-amazon-rainforest.png"],
-    fechaCreacion: "2024-01-20"
-  },
-  {
-    id: "4",
-    nombre: "Tiwanaku y Cultura Aymara",
-    ubicacion: "La Paz",
-    descripcionCorta: "Descubre la civilización preincaica más importante de Bolivia",
-    precio: "Bs. 450",
-    precioOriginal: "",
-    duracion: "1 día",
-    maxPersonas: 15,
-    calificacion: 4.4,
-    numeroReseñas: 156,
-    categoria: "Cultural",
-    dificultad: "Fácil",
-    descuento: 0,
-    imagenes: ["/tiwanaku-community.png", "/aymara-culture-bolivia.png"],
-    fechaCreacion: "2024-03-01"
-  },
-  {
-    id: "5",
-    nombre: "Trekking en los Andes",
-    ubicacion: "Cordillera Real",
-    descripcionCorta: "Aventura de alta montaña entre glaciares y lagunas andinas",
-    precio: "Bs. 1,800",
-    precioOriginal: "Bs. 2,000",
-    duracion: "4 días, 3 noches",
-    maxPersonas: 8,
-    calificacion: 4.7,
-    numeroReseñas: 45,
-    categoria: "Aventura",
-    dificultad: "Avanzada",
-    descuento: 10,
-    imagenes: ["/bolivia-andes-trekking.png"],
-    fechaCreacion: "2024-02-15"
-  }
-];
+import { paquetesData, Paquete } from "./paquetesData";
 
 export default function PaginaPaquetes() {
-  const [paquetes, setPaquetes] = useState(paquetesData);
-  const [paquetesFiltrados, setPaquetesFiltrados] = useState(paquetesData);
+  const [paquetes, setPaquetes] = useState<Paquete[]>(paquetesData);
+  const [paquetesFiltrados, setPaquetesFiltrados] = useState<Paquete[]>(paquetesData);
   const [terminoBusqueda, setTerminoBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState("");
   const [dificultadFiltro, setDificultadFiltro] = useState("");
@@ -121,8 +34,8 @@ export default function PaginaPaquetes() {
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
 
   // Obtener categorías únicas
-  const categorias = [...new Set(paquetes.map(p => p.categoria))];
-  const dificultades = [...new Set(paquetes.map(p => p.dificultad))];
+  const categorias = [...new Set(paquetes.map((p: Paquete) => p.categoria))];
+  const dificultades = [...new Set(paquetes.map((p: Paquete) => p.dificultad))];
 
   useEffect(() => {
     let filtrados = [...paquetes];
@@ -247,7 +160,7 @@ export default function PaginaPaquetes() {
                     >
                       <option value="">Todas las categorías</option>
                       {categorias.map(categoria => (
-                        <option key={categoria} value={categoria}>{categoria}</option>
+                     <option key={categoria} value={categoria}>{categoria}</option>
                       ))}
                     </select>
                   </div>
@@ -261,7 +174,7 @@ export default function PaginaPaquetes() {
                     >
                       <option value="">Todas las dificultades</option>
                       {dificultades.map(dificultad => (
-                        <option key={dificultad} value={dificultad}>{dificultad}</option>
+                     <option key={dificultad} value={dificultad}>{dificultad}</option>
                       ))}
                     </select>
                   </div>
@@ -299,7 +212,7 @@ export default function PaginaPaquetes() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paquetesFiltrados.map((paquete) => (
-              <Card key={paquete.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
+               <Card key={paquete.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
                 <div className="relative">
                   <div className="aspect-video relative overflow-hidden">
                     <Image

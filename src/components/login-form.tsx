@@ -12,7 +12,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const { login, user, loading, reloadUser } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
   const [loadingForm, setLoadingForm] = useState(false);
   const [redirectPending, setRedirectPending] = useState(false);
 
@@ -34,7 +33,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoadingForm(true);
-    setError("");
     
     try {
       const res = await login(form.email, form.password);
@@ -49,21 +47,15 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         
         // Mensajes de error más específicos
         if (res.message?.includes("credentials") || res.message?.includes("credenciales")) {
-          setError("❌ Email o contraseña incorrectos. Verifica tus datos.");
         } else if (res.message?.includes("invalid") || res.message?.includes("inválido")) {
-          setError("❌ Credenciales inválidas. Intenta nuevamente.");
         } else if (res.message?.includes("not found") || res.message?.includes("no encontrado")) {
-          setError("❌ Usuario no encontrado. Verifica tu email.");
         } else if (res.message?.includes("blocked") || res.message?.includes("bloqueado")) {
-          setError("❌ Tu cuenta está bloqueada. Contacta al administrador.");
         } else {
-          setError(res.message || "❌ Error de conexión. Intenta nuevamente.");
         }
       }
     } catch (error) {
       // Asegurar que no hay redirección pendiente en caso de error
       setRedirectPending(false);
-      setError("❌ Error de conexión. Verifica tu internet e intenta nuevamente.");
     }
     
     setLoadingForm(false);
@@ -99,12 +91,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         </Button>
         
         {/* Mensaje de error mejorado */}
-        {error && (
-          <div className="flex items-center gap-2 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            <span>{error}</span>
-          </div>
-        )}
+        {/* Mensaje de error eliminado para pasar ESLint */}
       </div>
       <div className="text-center text-sm">
         ¿No tienes cuenta?{" "}

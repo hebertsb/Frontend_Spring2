@@ -1,8 +1,7 @@
 'use client'
 
-import React, { useState, useEffect } from "react";
-import { Calendar, MapPin, Clock, User, Filter, Search } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState } from "react";
+import { Calendar, User, Filter, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -48,7 +47,7 @@ const ClientReservations = () => {
   const [reservations, setReservations] = useState(mockReservations);
   const [filtro, setFiltro] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading] = useState(false);
 
   // Filtrar reservas según estado y búsqueda
   const reservasFiltradas = reservations.filter(reserva => {
@@ -171,7 +170,7 @@ const ClientReservations = () => {
                     </div>
 
                     <div className="flex items-center gap-2 text-gray-600">
-                      <Clock className="w-4 h-4" />
+                      {/* <Clock className="w-4 h-4" /> */}
                       <div>
                         <div className="text-xs text-gray-500">Duración</div>
                         <div className="text-sm font-medium">{reserva.duracion}</div>

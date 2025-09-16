@@ -116,9 +116,12 @@ const ChangePasswordForm = () => {
       setTimeout(() => {
         logout();
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error al cambiar contraseña:", error);
-      const errorMsg = error.response?.data?.detail || "No se pudo cambiar la contraseña";
+      let errorMsg = "No se pudo cambiar la contraseña";
+      if (typeof error === "object" && error !== null && "response" in error && typeof (error as { response?: { data?: { detail?: string } } }).response?.data?.detail === "string") {
+        errorMsg = (error as { response?: { data?: { detail?: string } } }).response!.data!.detail!;
+      }
       toast({
         title: "❌ Error",
         description: errorMsg,
