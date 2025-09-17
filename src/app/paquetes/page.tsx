@@ -22,7 +22,7 @@ export default function PaginaPaquetes() {
 
   useEffect(() => {
     const fetchPaquetes = async () => {
-      const response = await fetch("http://127.0.0.1:8000/api/paquetes/");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/paquetes/`);
       const data: Paquete[] = await response.json(); // Tipar la respuesta con Paquete[]
       setPaquetes(data);
       setPaquetesFiltrados(data);
@@ -102,7 +102,7 @@ export default function PaginaPaquetes() {
 
         {/* Filtros y búsqueda */}
         {/* Código de búsqueda y filtros permanece igual */}
-        
+
         {/* Resultados */}
         <div className="mb-6">
           <p className="text-muted-foreground">
@@ -125,7 +125,7 @@ export default function PaginaPaquetes() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {paquetesFiltrados.map((paquete) => (
-               <Card key={paquete.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
+              <Card key={paquete.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
                 <div className="relative">
                   <div className="aspect-video relative overflow-hidden">
                     <Image
@@ -135,7 +135,7 @@ export default function PaginaPaquetes() {
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                   </div>
-                  
+
                   {/* Overlay con iconos */}
                   <div className="absolute top-2 right-2 flex gap-2">
                     {paquete.descuento && paquete.descuento > 0 && (
@@ -185,11 +185,10 @@ export default function PaginaPaquetes() {
                       {[...Array(5)].map((_, i) => (
                         <Star
                           key={i}
-                          className={`h-4 w-4 ${
-                            i < Math.floor(paquete.calificacion)
+                          className={`h-4 w-4 ${i < Math.floor(paquete.calificacion)
                               ? "text-amber-400 fill-amber-400"
                               : "text-gray-300"
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
