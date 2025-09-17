@@ -48,11 +48,15 @@ export function Navegacion() {
               
               // Verificar si el usuario es admin (rol 1 o rol "ADMIN")
               const isAdmin = user?.roles?.includes(1) || user?.role === "ADMIN";
+              // Verificar si el usuario es soporte (rol 4 o rol "SOPORTE")  
+              const isSupport = user?.roles?.includes(4) || user?.role === "SOPORTE";
               // Verificar si el usuario es cliente (rol 3 o rol "CLIENTE")
               const isClient = user?.roles?.includes(3) || user?.role === "CLIENTE";
               
               if (isAdmin) {
                 return <LoadingLink href="/panel">Panel Admin</LoadingLink>;
+              } else if (isSupport) {
+                return <LoadingLink href="/panel">Panel Soporte</LoadingLink>;
               } else if (isClient) {
                 return <LoadingLink href="/cliente">Mi Panel</LoadingLink>;
               }
@@ -109,6 +113,8 @@ export function Navegacion() {
                 
                 // Verificar si el usuario es admin (rol 1 o rol "ADMIN")
                 const isAdmin = user?.roles?.includes(1) || user?.role === "ADMIN";
+                // Verificar si el usuario es soporte (rol 4 o rol "SOPORTE")
+                const isSupport = user?.roles?.includes(4) || user?.role === "SOPORTE";
                 // Verificar si el usuario es cliente (rol 3 o rol "CLIENTE")
                 const isClient = user?.roles?.includes(3) || user?.role === "CLIENTE";
                 
@@ -116,6 +122,12 @@ export function Navegacion() {
                   return (
                     <LoadingLink href="/panel" className="block px-3 py-2">
                       Panel Admin
+                    </LoadingLink>
+                  );
+                } else if (isSupport) {
+                  return (
+                    <LoadingLink href="/panel" className="block px-3 py-2">
+                      Panel Soporte
                     </LoadingLink>
                   );
                 } else if (isClient) {

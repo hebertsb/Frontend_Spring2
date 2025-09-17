@@ -23,7 +23,15 @@ export const editUser = async (id: string, data: EditUserData) => {
 import api from "../api/axios";
 
 export const login = async (email: string, password: string) => {
-  return api.post("/auth/login/", { email, password });
+  console.log("🔐 Intentando login con:", { email, password: "*".repeat(password.length) });
+  try {
+    const response = await api.post("/auth/login/", { email, password });
+    console.log("✅ Login exitoso:", response.data);
+    return response;
+  } catch (error: any) {
+    console.error("❌ Error en login:", error.response?.data || error.message);
+    throw error;
+  }
 };
 
 export const register = async (data: {
@@ -48,6 +56,19 @@ export const refresh = async (refresh: string) => {
 
 export const getUser = async () => {
   return api.get("/usuarios/me/");
+};
+
+// Solicitar recuperación de contraseña
+export const solicitarRecuperacionPassword = async (email: string) => {
+  return api.post("/auth/solicitar-recuperacion-password/", { email });
+};
+
+// Restablecer contraseña con token
+export const restablecerPassword = async (token: string, password: string, email: string) => {
+  console.log("Enviando reset password:", { email, token, password });
+  
+  // SIEMPRE incluir email para validación de seguridad
+  return api.post("/auth/reset-password/", { email, token, password });
 };
 
 // Editar datos del usuario autenticado

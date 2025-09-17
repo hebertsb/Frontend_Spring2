@@ -42,14 +42,13 @@ export default function ProtectedRoute({
     }
   }, [user, loading, allowedRoles, requireAuth, redirectTo, router]);
 
-  // Función auxiliar para convertir ID de rol a nombre
+  // Función auxiliar para convertir ID de rol a nombre (alineado con backend)
   const getRoleName = (roleId: number): string => {
     const roleMap: Record<number, string> = {
       1: "ADMIN",
       2: "OPERADOR", 
       3: "CLIENTE",
-      4: "USUARIO",
-      5: "SOPORTE"
+      4: "SOPORTE"
     };
     return roleMap[roleId] || "";
   };

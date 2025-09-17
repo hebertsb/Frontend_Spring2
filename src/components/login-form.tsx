@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle } from "lucide-react";
+import Link from "next/link";
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -77,12 +78,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         <div className="grid gap-3">
           <div className="flex items-center">
             <Label htmlFor="login-password">Contraseña</Label>
-            <a
-              href="#"
-              className="ml-auto text-sm underline-offset-4 hover:underline"
+            <Link
+              href="/recuperar-password"
+              className="ml-auto text-sm underline-offset-4 hover:underline text-amber-600"
             >
               ¿Olvidaste tu contraseña?
-            </a>
+            </Link>
           </div>
               <Input id="login-password" type="password" value={form.password} onChange={handleChange} required />
         </div>

@@ -13,7 +13,7 @@ interface User {
   roles?: number[]; // Array de IDs de roles
 }
 
-// Mapeo de IDs de roles a nombres
+// Mapeo de IDs de roles a nombres (alineado con backend)
 const ROLE_MAP: Record<number, string> = {
   1: "ADMIN",
   2: "OPERADOR",

@@ -21,7 +21,7 @@ export default function Page() {
 
   return (
     <ProtectedRoute 
-      allowedRoles={[1]} // Solo admin (rol ID 1)
+      allowedRoles={[1, 4]} // Admin (rol ID 1) y Soporte (rol ID 4)
       requireAuth={true}
       redirectTo="/"
     >

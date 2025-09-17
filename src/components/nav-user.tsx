@@ -29,8 +29,9 @@ export function NavUser({ user }: { user: { name: string; email: string; avatar:
   const { isMobile } = useSidebar();
   if (!user) return null;
 
-  // Verificar si el usuario es admin (rol ID 1)
+  // Verificar si el usuario es admin (rol ID 1) o soporte (rol ID 4)
   const isAdmin = user.roles?.includes(1) || false;
+  const isSupport = user.roles?.includes(4) || false;
 
   // Solo el primer nombre y la inicial
   const getInitials = (name: string) => {
@@ -79,7 +80,7 @@ export function NavUser({ user }: { user: { name: string; email: string; avatar:
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          {!isAdmin && (
+          {!isAdmin && !isSupport && (
             <DropdownMenuItem asChild>
               <a href="/cliente" className="flex items-center gap-2 w-full">
                 <IconUserCircle />
@@ -92,6 +93,14 @@ export function NavUser({ user }: { user: { name: string; email: string; avatar:
               <a href="/panel?tab=usuarios" className="flex items-center gap-2 w-full">
                 <IconUserCircle />
                 Panel Admin
+              </a>
+            </DropdownMenuItem>
+          )}
+          {isSupport && (
+            <DropdownMenuItem asChild>
+              <a href="/panel?tab=usuarios" className="flex items-center gap-2 w-full">
+                <IconUserCircle />
+                Panel Soporte
               </a>
             </DropdownMenuItem>
           )}

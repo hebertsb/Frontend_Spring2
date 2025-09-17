@@ -12,13 +12,12 @@ import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivate
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 
-// Mapeo de IDs de roles a nombres
+// Mapeo de IDs de roles a nombres (alineado con backend)
 const ROLE_MAP: Record<number, string> = {
   1: "ADMIN",
   2: "OPERADOR", 
   3: "CLIENTE",
-  4: "USUARIO",
-  5: "SOPORTE"
+  4: "SOPORTE"
 };
 
 interface User {
@@ -47,7 +46,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { logout, user: currentUser } = useAuth();
   const [filterRole, setFilterRole] = useState("todos");
   const [filterStatus, setFilterStatus] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
@@ -68,6 +67,25 @@ const AdminDashboard = () => {
     email: ""
   });
 
+  // Determinar el tipo de panel según el rol del usuario
+  const getPanelTitle = () => {
+    if (currentUser?.roles?.includes(1) || currentUser?.role === "ADMIN") {
+      return "Panel Administrativo - Turismo Bolivia";
+    } else if (currentUser?.roles?.includes(4) || currentUser?.role === "SOPORTE") {
+      return "Panel de Soporte - Turismo Bolivia";
+    }
+    return "Panel de Gestión - Turismo Bolivia";
+  };
+
+  const getPanelDescription = () => {
+    if (currentUser?.roles?.includes(1) || currentUser?.role === "ADMIN") {
+      return "Gestiona usuarios, roles y permisos de tu plataforma turística";
+    } else if (currentUser?.roles?.includes(4) || currentUser?.role === "SOPORTE") {
+      return "Proporciona soporte y gestiona usuarios de la plataforma turística";
+    }
+    return "Gestiona tu plataforma turística";
+  };
+
   useEffect(() => {
     setLoading(true);
     listUsers()
@@ -80,11 +98,23 @@ const AdminDashboard = () => {
     const nombres = user.nombres || "";
     const apellidos = user.apellidos || "";
     const nombreCompleto = `${nombres} ${apellidos}`.trim();
-        return ( 
-          (nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || user.email.toLowerCase().includes(searchTerm.toLowerCase())) && 
-          (filterRole === "todos" || user.roles?.includes(Number(filterRole))) && 
-          (filterStatus === "todos" || (user.estado?.toLowerCase() === filterStatus)) 
-        ); 
+    
+    // Filtro de búsqueda por nombre o email
+    const matchesSearch = nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Filtro por rol - corregido para trabajar con nombres de roles
+    let matchesRole = true;
+    if (filterRole !== "todos") {
+      // Convertir los IDs de roles del usuario a nombres y verificar si incluye el rol seleccionado
+      const userRoleNames = (user.roles || []).map(roleId => ROLE_MAP[roleId]).filter(Boolean);
+      matchesRole = userRoleNames.includes(filterRole);
+    }
+    
+    // Filtro por estado
+    const matchesStatus = filterStatus === "todos" || (user.estado?.toLowerCase() === filterStatus);
+    
+    return matchesSearch && matchesRole && matchesStatus;
   });
 
   // Deshabilitar usuario
@@ -268,11 +298,11 @@ const AdminDashboard = () => {
         <div className="flex items-center gap-3 mb-4">
           <MapPin className="w-8 h-8 text-blue-600" />
           <h1 className="text-3xl font-bold text-gray-900">
-            Panel Administrativo - Turismo Bolivia
+            {getPanelTitle()}
           </h1>
         </div>
         <p className="text-gray-600">
-          Gestiona usuarios, roles y permisos de tu plataforma turística
+          {getPanelDescription()}
         </p>
       </div>
 
@@ -357,7 +387,7 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 text-sm font-medium">Soporte</p>
-                  <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.roles?.includes(5)).length}</p>
+                  <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.roles?.includes(4)).length}</p>
                 </div>
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Users className="w-6 h-6 text-indigo-600" />
