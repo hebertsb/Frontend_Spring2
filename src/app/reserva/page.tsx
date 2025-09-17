@@ -377,7 +377,7 @@ export default function PaginaReserva() {
           </div>
         </div>
       </div>
-
+      
       <PiePagina />
     </div>
   )
