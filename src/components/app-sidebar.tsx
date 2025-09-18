@@ -42,10 +42,11 @@ const data = {
   navMain: [
     { title: "Dashboard", url: "/panel", icon: IconDashboard },
     { title: "Gestión de usuarios", url: "/panel?tab=usuarios", icon: IconUsers },
-    { title: "Lifecycle", url: "#", icon: IconListDetails },
-    { title: "Analytics", url: "#", icon: IconChartBar },
-    { title: "Projects", url: "#", icon: IconFolder },
-    { title: "Team", url: "#", icon: IconUsers },
+    { title: "Gestión de reservas", url: "/panel?tab=reservas", icon: IconListDetails },
+    { title: "Cupones y descuentos", url: "#", icon: IconListDetails },
+    { title: "Gestión de informes", url: "#", icon: IconChartBar },
+   // { title: "Projects", url: "#", icon: IconFolder },
+    
   ],
   navClouds: [
     {
@@ -78,14 +79,14 @@ const data = {
     },
   ],
   navSecondary: [
-    { title: "Settings", url: "#", icon: IconSettings },
-    { title: "Get Help", url: "#", icon: IconHelp },
-    { title: "Search", url: "#", icon: IconSearch },
+    { title: "Configuración", url: "#", icon: IconSettings },
+    { title: "Obtén ayuda", url: "#", icon: IconHelp },
+    { title: "Buscar", url: "#", icon: IconSearch },
   ],
   documents: [
-    { name: "Data Library", url: "#", icon: IconDatabase },
-    { name: "Reports", url: "#", icon: IconReport },
-    { name: "Word Assistant", url: "#", icon: IconFileWord },
+    { name: "Biblioteca de Datos", url: "#", icon: IconDatabase },
+    { name: "Informes", url: "#", icon: IconReport },
+    //{ name: "Asistente de Word", url: "#", icon: IconFileWord },
   ],
 }
 
