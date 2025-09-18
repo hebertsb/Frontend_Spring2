@@ -5,6 +5,8 @@ import { PiePagina } from "@/components/comunes/pie-pagina";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 import {
   Star,
   Heart,
@@ -24,7 +26,9 @@ import Image from "next/image";
 export default function DetallePaqueteCliente({ paquete }: { paquete: any }) {
   const [titulo, setTitulo] = useState("");
   const [imagenActual, setImagenActual] = useState(0);
+  const [esFavorito, setEsFavorito] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (paquete) {

@@ -37,11 +37,27 @@ export default function PaginaDestinos() {
   // Fetch de servicios desde la API
   useEffect(() => {
     const fetchServicios = async () => {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/servicios/`
-      );
-      const data: Servicio[] = await response.json(); // Tipado correcto de la respuesta
-      setServicios(data);
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/servicios/`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("La respuesta no es JSON válido");
+        }
+        
+        const data: Servicio[] = await response.json();
+        setServicios(data);
+      } catch (error) {
+        console.error('Error al cargar servicios:', error);
+        // En caso de error, usar datos vacíos o de respaldo
+        setServicios([]);
+      }
     };
 
     fetchServicios();

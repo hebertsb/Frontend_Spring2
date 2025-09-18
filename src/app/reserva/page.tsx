@@ -57,6 +57,11 @@ export default function PaginaReserva() {
   const [reservaCompletada, setReservaCompletada] = useState(false)
   const [numeroReserva, setNumeroReserva] = useState("")
 
+  // Estados para información del servicio/paquete
+  const [servicio, setServicio] = useState<Servicio | null>(null)
+  
+  // Parámetros de la URL
+  const idServicio = searchParams?.get("id")
   const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
   const precioPaquete = searchParams?.get("precio") || "$0"
 
@@ -65,9 +70,29 @@ const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   useEffect(() => {
     if (idServicio) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${idServicio}`)
-        .then((res) => res.json())
-        .then((data) => setServicio(data))
+      // Intentar cargar información adicional del servicio desde el backend
+      const fetchServicio = async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${idServicio}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("La respuesta no es JSON válido");
+          }
+          
+          const data = await response.json();
+          setServicio(data);
+        } catch (error) {
+          console.warn('No se pudo cargar información adicional del servicio:', error);
+          // No es crítico, ya tenemos la información básica de los parámetros de URL
+        }
+      };
+      
+      fetchServicio();
     }
   }, [idServicio])
 
@@ -333,7 +358,7 @@ const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
                   <h3 className="font-semibold text-lg">{nombrePaquete}</h3>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     <MapPin className="h-4 w-4" />
-                    <span>{servicio?.tipo || "Multi-destino"}</span>
+                    <span>{servicio?.tipo || "Destino turístico"}</span>
                   </div>
                 </div>
 
@@ -349,10 +374,12 @@ const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total</span>
                     <span className="text-primary">
-                      Bs.{" "}
-                      {servicio?.costo
-                        ? (servicio.costo * parseInt(datosReserva.numeroPersonas)).toFixed(2)
-                        : "0.00"}
+                      {(() => {
+                        // Extraer el número del precio que viene como "$150.00" o "150"
+                        const precioNumerico = parseFloat(precioPaquete.replace(/[^0-9.]/g, '')) || 0;
+                        const total = precioNumerico * parseInt(datosReserva.numeroPersonas);
+                        return `$${total.toFixed(2)}`;
+                      })()}
                     </span>
                   </div>
                 </div>

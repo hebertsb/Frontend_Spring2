@@ -13,9 +13,35 @@ import DetalleDestinoCliente from "./DetalleDestinoCliente";
 import { Servicio } from "@/lib/servicios";
 
 export default async function Page({ params }: { params: { id: string } }) {
-  // Fetch de datos del destino
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, { cache: "no-store" });
-  if (!res.ok) {
+  let destino: Servicio | null = null;
+  let error: string | null = null;
+
+  try {
+    // Fetch de datos del destino
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, { 
+      cache: "no-store",
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!res.ok) {
+      throw new Error(`HTTP error! status: ${res.status}`);
+    }
+    
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("La respuesta no es JSON válido");
+    }
+    
+    destino = await res.json();
+  } catch (err) {
+    console.error('Error al cargar destino:', err);
+    error = err instanceof Error ? err.message : 'Error desconocido';
+  }
+
+  if (error || !destino) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
         <Navegacion />
@@ -23,25 +49,19 @@ export default async function Page({ params }: { params: { id: string } }) {
           <h1 className="mb-4 text-2xl font-bold font-heading text-foreground">
             Destino no encontrado
           </h1>
+          {error && (
+            <p className="text-red-600 mb-4">Error: {error}</p>
+          )}
           <PiePagina />
         </div>
       </div>
     );
   }
-  const destino: Servicio = await res.json();
 
-return (
-  <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
- 
-
-    {/* <pre className="p-4 m-4 bg-white rounded-lg shadow-md overflow-x-auto">
-      {JSON.stringify(destino, null, 2)}
-    </pre> */}
-
-    <DetalleDestinoCliente destino={destino}/>
-
-    <PiePagina />
-  </div>
-);
-
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
+      <DetalleDestinoCliente destino={destino}/>
+      <PiePagina />
+    </div>
+  );
 }
