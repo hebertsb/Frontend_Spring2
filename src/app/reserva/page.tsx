@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar, CreditCard, Shield, MapPin, CheckCircle, Phone, Mail, User } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+ import { Servicio } from "@/lib/servicios"
 import { crearReserva } from "@/api/reservas"
 import { useToast } from "@/hooks/use-toast"
 import useAuth from "@/hooks/useAuth"
@@ -58,10 +59,17 @@ export default function PaginaReserva() {
 
   const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
   const precioPaquete = searchParams?.get("precio") || "$0"
-  const paqueteId = searchParams?.get("id") || null
 
-  // Fecha mínima para la salida (evita recalcular en cada render)
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+// Fecha mínima para la salida (evita recalcular en cada render)
+const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+
+  useEffect(() => {
+    if (idServicio) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${idServicio}`)
+        .then((res) => res.json())
+        .then((data) => setServicio(data))
+    }
+  }, [idServicio])
 
   /* ---------- Actualizador tipado por clave ---------- */
   const manejarCambio = <K extends keyof DatosReserva>(campo: K, valor: DatosReserva[K]) => {
@@ -69,152 +77,21 @@ export default function PaginaReserva() {
   }
 
   const manejarEnvio = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     // Validaciones básicas
     if (!datosReserva.aceptaTerminos) {
-      toast({
-        title: "Error",
-        description: "Debes aceptar los términos y condiciones para continuar",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validar campos requeridos
-    const camposRequeridos = [
-      { campo: datosReserva.nombre, nombre: "Nombre" },
-      { campo: datosReserva.apellido, nombre: "Apellido" },
-      { campo: datosReserva.email, nombre: "Email" },
-      { campo: datosReserva.telefono, nombre: "Teléfono" },
-      { campo: datosReserva.fechaSalida, nombre: "Fecha de salida" },
-    ]
-
-    for (const { campo, nombre } of camposRequeridos) {
-      if (!campo.trim()) {
-        toast({
-          title: "Campo requerido",
-          description: `El campo ${nombre} es obligatorio`,
-          variant: "destructive",
-        })
-        return
-      }
-    }
-
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(datosReserva.email)) {
-      toast({
-        title: "Email inválido",
-        description: "Por favor ingresa un email válido",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Verificar que el usuario esté autenticado
-    if (!user) {
-      toast({
-        title: "Error",
-        description: "Debes iniciar sesión para realizar una reserva",
-        variant: "destructive",
-      })
-      router.push("/login")
+      alert("Debes aceptar los términos y condiciones para continuar")
       return
     }
 
     setProcesandoReserva(true)
 
-    try {
-      // Calcular precio total
-      const precioUnitario = parseFloat(precioPaquete.replace("$", ""))
-      const total = precioUnitario * parseInt(datosReserva.numeroPersonas)
+    // Simula procesamiento
+    await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Preparar datos para el backend según la estructura esperada
-      // Preparar datos de la reserva para el backend
-      // NOTA: Acompañantes comentados hasta que el backend los soporte correctamente
-      const acompanantesData = Array.from({ length: Math.max(0, parseInt(datosReserva.numeroPersonas) - 1) }, (_, index) => ({
-        nombre: `Acompañante ${index + 1}`,
-        apellido: "",
-        fecha_nacimiento: "1990-01-01"
-      }));
-
-      const reservaData = {
-        fecha_inicio: datosReserva.fechaSalida,
-        estado: "PENDIENTE",
-        total: total.toString(),
-        detalles: [
-          {
-            servicio: 1, // ID del servicio (puedes ajustar según sea necesario)
-            tipo: "Turismo",
-            titulo: nombrePaquete,
-            precio_unitario: precioUnitario.toString(),
-            cantidad: parseInt(datosReserva.numeroPersonas),
-            fecha_servicio: datosReserva.fechaSalida + "T09:00:00-04:00"
-          }
-        ],
-        // ACOMPAÑANTES DESHABILITADOS TEMPORALMENTE
-        // Motivo: El backend tiene problemas con la validación de acompañantes
-        // Para habilitar en el futuro, descomentar la siguiente línea:
-        // acompanantes: acompanantesData,
-        notas: datosReserva.solicitudesEspeciales || ""
-      }
-
-      console.log("📝 Enviando reserva:", reservaData)
-      console.log("🧪 NOTA: Enviando SIN acompañantes (basado en problema identificado en edición)")
-      console.log("🔄 ESTRUCTURA: Usando formato de detalles simplificado que funciona en admin")
-
-      const response = await crearReserva(reservaData)
-      
-      console.log("✅ Reserva creada exitosamente:", response.data)
-      
-      // Generar número de reserva
-      const numeroReservaGenerado = `BOL-${response.data.id || Date.now()}`
-      setNumeroReserva(numeroReservaGenerado)
-      
-      setReservaCompletada(true)
-      
-      toast({
-        title: "¡Reserva Confirmada!",
-        description: `Tu reserva ${numeroReservaGenerado} ha sido creada exitosamente`,
-      })
-      
-    } catch (error: any) {
-      console.error("❌ Error al crear reserva:", error)
-      console.error("❌ Respuesta del servidor:", error.response?.data)
-      console.error("❌ Status code:", error.response?.status)
-      
-      // Mostrar error específico del backend si está disponible
-      let mensajeError = "Ha ocurrido un error inesperado";
-      if (error.response?.data) {
-        if (typeof error.response.data === 'string') {
-          mensajeError = error.response.data;
-        } else if (error.response.data.message) {
-          mensajeError = error.response.data.message;
-        } else if (error.response.data.detail) {
-          mensajeError = error.response.data.detail;
-        } else {
-          // Mostrar errores de validación específicos
-          const errores = Object.entries(error.response.data)
-            .map(([campo, mensajes]) => {
-              if (Array.isArray(mensajes)) {
-                return `${campo}: ${mensajes.join(', ')}`;
-              }
-              return `${campo}: ${mensajes}`;
-            })
-            .join('\n');
-          mensajeError = errores || "Error de validación en el backend";
-        }
-      }
-      
-      toast({
-        title: "Error al procesar reserva",
-        description: mensajeError,
-        variant: "destructive",
-      })
-    } finally {
-      setProcesandoReserva(false)
-    }
+    setProcesandoReserva(false)
+    setReservaCompletada(true)
   }
 
   if (reservaCompletada) {
@@ -258,7 +135,7 @@ export default function PaginaReserva() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
         {/* Header */}
         <div className="mb-8 animate-slide-up">
-          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
+          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text  mb-2">
             Completa tu Reserva
           </h1>
           <p className="text-muted-foreground">Estás a un paso de vivir una experiencia inolvidable en Bolivia</p>
@@ -456,7 +333,7 @@ export default function PaginaReserva() {
                   <h3 className="font-semibold text-lg">{nombrePaquete}</h3>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     <MapPin className="h-4 w-4" />
-                    <span>Multi-destino</span>
+                    <span>{servicio?.tipo || "Multi-destino"}</span>
                   </div>
                 </div>
 
@@ -472,9 +349,10 @@ export default function PaginaReserva() {
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total</span>
                     <span className="text-primary">
-                      $
-                      {Number.parseFloat(precioPaquete.replace("$", "")) *
-                        Number.parseInt(datosReserva.numeroPersonas)}
+                      Bs.{" "}
+                      {servicio?.costo
+                        ? (servicio.costo * parseInt(datosReserva.numeroPersonas)).toFixed(2)
+                        : "0.00"}
                     </span>
                   </div>
                 </div>

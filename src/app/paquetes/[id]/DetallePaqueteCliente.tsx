@@ -20,11 +20,8 @@ import {
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { toast } from "@/hooks/use-toast";
 
 export default function DetallePaqueteCliente({ paquete }: { paquete: any }) {
-  const [esFavorito, setEsFavorito] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [imagenActual, setImagenActual] = useState(0);
   const router = useRouter();
