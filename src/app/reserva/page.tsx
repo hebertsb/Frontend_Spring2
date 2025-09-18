@@ -13,8 +13,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar, CreditCard, Shield, MapPin, CheckCircle, Phone, Mail, User } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+ import { Servicio } from "@/lib/servicios"
+import { crearReserva } from "@/api/reservas"
+import { useToast } from "@/hooks/use-toast"
+import useAuth from "@/hooks/useAuth"
 
 /* ---------- Tipos fuertes para el estado ---------- */
 interface DatosReserva {
@@ -33,6 +37,8 @@ interface DatosReserva {
 export default function PaginaReserva() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
+  const { user } = useAuth()
 
   const [datosReserva, setDatosReserva] = useState<DatosReserva>({
     nombre: "",
@@ -49,12 +55,46 @@ export default function PaginaReserva() {
 
   const [procesandoReserva, setProcesandoReserva] = useState(false)
   const [reservaCompletada, setReservaCompletada] = useState(false)
+  const [numeroReserva, setNumeroReserva] = useState("")
 
+  // Estados para información del servicio/paquete
+  const [servicio, setServicio] = useState<Servicio | null>(null)
+  
+  // Parámetros de la URL
+  const idServicio = searchParams?.get("id")
   const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
   const precioPaquete = searchParams?.get("precio") || "$0"
 
-  // Fecha mínima para la salida (evita recalcular en cada render)
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+// Fecha mínima para la salida (evita recalcular en cada render)
+const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+
+  useEffect(() => {
+    if (idServicio) {
+      // Intentar cargar información adicional del servicio desde el backend
+      const fetchServicio = async () => {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${idServicio}`);
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("La respuesta no es JSON válido");
+          }
+          
+          const data = await response.json();
+          setServicio(data);
+        } catch (error) {
+          console.warn('No se pudo cargar información adicional del servicio:', error);
+          // No es crítico, ya tenemos la información básica de los parámetros de URL
+        }
+      };
+      
+      fetchServicio();
+    }
+  }, [idServicio])
 
   /* ---------- Actualizador tipado por clave ---------- */
   const manejarCambio = <K extends keyof DatosReserva>(campo: K, valor: DatosReserva[K]) => {
@@ -62,8 +102,9 @@ export default function PaginaReserva() {
   }
 
   const manejarEnvio = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
+    // Validaciones básicas
     if (!datosReserva.aceptaTerminos) {
       alert("Debes aceptar los términos y condiciones para continuar")
       return
@@ -92,7 +133,10 @@ export default function PaginaReserva() {
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-muted-foreground">
-                <strong>Número de reserva:</strong> BOL-{Date.now()}
+                <strong>Número de reserva:</strong> {numeroReserva || `BOL-${Date.now()}`}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Estado:</strong> Pendiente de confirmación
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -116,7 +160,7 @@ export default function PaginaReserva() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
         {/* Header */}
         <div className="mb-8 animate-slide-up">
-          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
+          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text  mb-2">
             Completa tu Reserva
           </h1>
           <p className="text-muted-foreground">Estás a un paso de vivir una experiencia inolvidable en Bolivia</p>
@@ -314,7 +358,7 @@ export default function PaginaReserva() {
                   <h3 className="font-semibold text-lg">{nombrePaquete}</h3>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     <MapPin className="h-4 w-4" />
-                    <span>Multi-destino</span>
+                    <span>{servicio?.tipo || "Destino turístico"}</span>
                   </div>
                 </div>
 
@@ -330,9 +374,12 @@ export default function PaginaReserva() {
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total</span>
                     <span className="text-primary">
-                      $
-                      {Number.parseFloat(precioPaquete.replace("$", "")) *
-                        Number.parseInt(datosReserva.numeroPersonas)}
+                      {(() => {
+                        // Extraer el número del precio que viene como "$150.00" o "150"
+                        const precioNumerico = parseFloat(precioPaquete.replace(/[^0-9.]/g, '')) || 0;
+                        const total = precioNumerico * parseInt(datosReserva.numeroPersonas);
+                        return `$${total.toFixed(2)}`;
+                      })()}
                     </span>
                   </div>
                 </div>
