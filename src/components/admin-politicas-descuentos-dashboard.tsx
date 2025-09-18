@@ -1153,7 +1153,7 @@ const AdminPoliticasDescuentosDashboard = () => {
           <div className="bg-green-50 border border-green-200 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-green-900 mb-4">💡 Ejemplo Práctico</h3>
             <div className="bg-white rounded-lg p-4 border border-green-200">
-              <h4 className="font-medium text-green-900 mb-2">Política: "Descuento 20% en Tours a Uyuni"</h4>
+              <h4 className="font-medium text-green-900 mb-2">Política: "Descuento 20% en Tours a Uyuni</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-green-800"><strong>✅ Condiciones:</strong></p>

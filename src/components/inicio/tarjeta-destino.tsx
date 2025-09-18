@@ -16,14 +16,12 @@ interface PropsTarjetaDestino {
   precio?: string;
   reseñas?: number;
   duracion?: string;
-  datos: Servicio;
 }
 
 export function TarjetaDestino({
   id,
   nombre,
   
-  datos,
   descripcion,
   calificacion,
   urlImagen,
@@ -32,7 +30,7 @@ export function TarjetaDestino({
 }: PropsTarjetaDestino) {
   const router = useRouter();
   const calificacionSegura = Math.max(0, Math.min(5, calificacion || 0));
-
+  
   const handleVerDetalles = () => {
     router.push(`/destinos/${id}`);
   };

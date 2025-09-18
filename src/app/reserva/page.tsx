@@ -51,16 +51,14 @@ export default function PaginaReserva() {
   const [procesandoReserva, setProcesandoReserva] = useState(false)
   const [reservaCompletada, setReservaCompletada] = useState(false)
 
-  const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
-  const precioPaquete = searchParams?.get("precio") || "$0"
-  const idServicio = searchParams.get("id")
+const [servicio, setServicio] = useState<Servicio | null>(null)
 
+const nombrePaquete = servicio?.titulo || "Paquete seleccionado";
+const precioPaquete = servicio?.costo ? `Bs. ${servicio.costo.toString()}` : "$0";
+const idServicio = searchParams.get("id")
 
-  
-    const [servicio, setServicio] = useState<Servicio | null>(null)
- 
-  // Fecha mínima para la salida (evita recalcular en cada render)
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+// Fecha mínima para la salida (evita recalcular en cada render)
+const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
 
   useEffect(() => {
     if (idServicio) {
@@ -76,20 +74,62 @@ export default function PaginaReserva() {
   }
 
   const manejarEnvio = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!datosReserva.aceptaTerminos) {
-      alert("Debes aceptar los términos y condiciones para continuar")
-      return
+      alert("Debes aceptar los términos y condiciones para continuar");
+      return;
     }
 
-    setProcesandoReserva(true)
+    setProcesandoReserva(true);
 
-    // Simula procesamiento
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    // Ejemplo: usuarioId debe venir de tu sistema de autenticación
+    const usuarioId = 1; // <-- reemplaza por el ID real del usuario
 
-    setProcesandoReserva(false)
-    setReservaCompletada(true)
+    const payload = {
+      usuario: usuarioId,
+      fecha_inicio: datosReserva.fechaSalida + "T08:00:00-04:00",
+      total: servicio ? servicio.costo * parseInt(datosReserva.numeroPersonas) : 0,
+      moneda: "BOB",
+      detalles: [
+        {
+          servicio: servicio?.id,
+          cantidad: parseInt(datosReserva.numeroPersonas),
+          precio_unitario: servicio ? servicio.costo : 0,
+          fecha_servicio: datosReserva.fechaSalida + "T08:00:00-04:00"
+        }
+      ],
+      acompanantes: [
+        {
+          documento: "12345678", // puedes pedirlo en el formulario
+          nombre: datosReserva.nombre,
+          apellido: datosReserva.apellido,
+          fecha_nacimiento: datosReserva.fechaNacimiento,
+          email: datosReserva.email,
+          telefono: datosReserva.telefono,
+          es_titular: true
+        }
+      ]
+    };
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/reservas/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+        // Si usas autenticación, agrega el token aquí:
+        // "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      credentials: "include" // si tu API requiere cookies/session
+    });
+
+    if (res.ok) {
+      setProcesandoReserva(false);
+      setReservaCompletada(true);
+    } else {
+      setProcesandoReserva(false);
+      alert("Error al procesar la reserva");
+    }
   }
 
   if (reservaCompletada) {
@@ -328,7 +368,7 @@ export default function PaginaReserva() {
                   <h3 className="font-semibold text-lg">{nombrePaquete}</h3>
                   <div className="flex items-center space-x-2 text-sm text-muted-foreground mt-1">
                     <MapPin className="h-4 w-4" />
-                    <span>Multi-destino</span>
+                    <span>{servicio?.tipo || "Multi-destino"}</span>
                   </div>
                 </div>
 
@@ -344,9 +384,10 @@ export default function PaginaReserva() {
                   <div className="flex justify-between text-lg font-bold border-t pt-2">
                     <span>Total</span>
                     <span className="text-primary">
-                      $
-                      {Number.parseFloat(precioPaquete.replace("$", "")) *
-                        Number.parseInt(datosReserva.numeroPersonas)}
+                      Bs.{" "}
+                      {servicio?.costo
+                        ? (servicio.costo * parseInt(datosReserva.numeroPersonas)).toFixed(2)
+                        : "0.00"}
                     </span>
                   </div>
                 </div>

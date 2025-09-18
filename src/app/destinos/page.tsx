@@ -85,7 +85,7 @@ export default function PaginaDestinos() {
               {Servicios.map((servicio) =>
                 vistaActual === "grid" ? (
                   <TarjetaDestino
-                    datos={servicio} // <-- aquí pasas todo el objeto
+                    // datos={servicio} // <-- aquí pasas todo el objeto
                     key={servicio.id}
                     id={servicio.id}
                     nombre={servicio.titulo}

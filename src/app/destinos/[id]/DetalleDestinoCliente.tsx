@@ -22,7 +22,11 @@ import { toast } from "@/hooks/use-toast";
 
 import { Servicio } from "@/lib/servicios";
 
-export default function DetalleDestinoCliente({ destino }: { destino: Servicio }) {
+export default function DetalleDestinoCliente({
+  destino,
+}: {
+  destino: Servicio;
+}) {
   const router = useRouter();
   const [esFavorito, setEsFavorito] = useState(false);
 
@@ -151,7 +155,9 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
               >
                 <Heart
                   className={`h-5 w-5 transition-colors ${
-                    esFavorito ? "fill-red-500 text-red-500 animate-heartBeat" : ""
+                    esFavorito
+                      ? "fill-red-500 text-red-500 animate-heartBeat"
+                      : ""
                   }`}
                 />
                 Guardar
@@ -237,7 +243,8 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
                   </div>
                 </div>
 
-                <Button className="w-full py-3 mb-3 font-semibold text-white transition-all duration-200 shadow-lg bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 hover:scale-105 hover:shadow-xl"
+                <Button
+                  className="w-full py-3 mb-3 font-semibold text-white transition-all duration-200 shadow-lg bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 hover:scale-105 hover:shadow-xl"
                   onClick={() => router.push(`/reserva?id=${destino.id}`)}
                 >
                   <Calendar className="w-4 h-4 mr-2" />
