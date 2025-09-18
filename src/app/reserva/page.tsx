@@ -15,6 +15,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar, CreditCard, Shield, MapPin, CheckCircle, Phone, Mail, User } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import { crearReserva } from "@/api/reservas"
+import { useToast } from "@/hooks/use-toast"
+import useAuth from "@/hooks/useAuth"
 
 /* ---------- Tipos fuertes para el estado ---------- */
 interface DatosReserva {
@@ -33,6 +36,8 @@ interface DatosReserva {
 export default function PaginaReserva() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { toast } = useToast()
+  const { user } = useAuth()
 
   const [datosReserva, setDatosReserva] = useState<DatosReserva>({
     nombre: "",
@@ -49,9 +54,11 @@ export default function PaginaReserva() {
 
   const [procesandoReserva, setProcesandoReserva] = useState(false)
   const [reservaCompletada, setReservaCompletada] = useState(false)
+  const [numeroReserva, setNumeroReserva] = useState("")
 
   const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
   const precioPaquete = searchParams?.get("precio") || "$0"
+  const paqueteId = searchParams?.get("id") || null
 
   // Fecha mínima para la salida (evita recalcular en cada render)
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
@@ -64,18 +71,150 @@ export default function PaginaReserva() {
   const manejarEnvio = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
+    // Validaciones básicas
     if (!datosReserva.aceptaTerminos) {
-      alert("Debes aceptar los términos y condiciones para continuar")
+      toast({
+        title: "Error",
+        description: "Debes aceptar los términos y condiciones para continuar",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar campos requeridos
+    const camposRequeridos = [
+      { campo: datosReserva.nombre, nombre: "Nombre" },
+      { campo: datosReserva.apellido, nombre: "Apellido" },
+      { campo: datosReserva.email, nombre: "Email" },
+      { campo: datosReserva.telefono, nombre: "Teléfono" },
+      { campo: datosReserva.fechaSalida, nombre: "Fecha de salida" },
+    ]
+
+    for (const { campo, nombre } of camposRequeridos) {
+      if (!campo.trim()) {
+        toast({
+          title: "Campo requerido",
+          description: `El campo ${nombre} es obligatorio`,
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(datosReserva.email)) {
+      toast({
+        title: "Email inválido",
+        description: "Por favor ingresa un email válido",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Verificar que el usuario esté autenticado
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Debes iniciar sesión para realizar una reserva",
+        variant: "destructive",
+      })
+      router.push("/login")
       return
     }
 
     setProcesandoReserva(true)
 
-    // Simula procesamiento
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      // Calcular precio total
+      const precioUnitario = parseFloat(precioPaquete.replace("$", ""))
+      const total = precioUnitario * parseInt(datosReserva.numeroPersonas)
 
-    setProcesandoReserva(false)
-    setReservaCompletada(true)
+      // Preparar datos para el backend según la estructura esperada
+      // Preparar datos de la reserva para el backend
+      // NOTA: Acompañantes comentados hasta que el backend los soporte correctamente
+      const acompanantesData = Array.from({ length: Math.max(0, parseInt(datosReserva.numeroPersonas) - 1) }, (_, index) => ({
+        nombre: `Acompañante ${index + 1}`,
+        apellido: "",
+        fecha_nacimiento: "1990-01-01"
+      }));
+
+      const reservaData = {
+        fecha_inicio: datosReserva.fechaSalida,
+        estado: "PENDIENTE",
+        total: total.toString(),
+        detalles: [
+          {
+            servicio: 1, // ID del servicio (puedes ajustar según sea necesario)
+            tipo: "Turismo",
+            titulo: nombrePaquete,
+            precio_unitario: precioUnitario.toString(),
+            cantidad: parseInt(datosReserva.numeroPersonas),
+            fecha_servicio: datosReserva.fechaSalida + "T09:00:00-04:00"
+          }
+        ],
+        // ACOMPAÑANTES DESHABILITADOS TEMPORALMENTE
+        // Motivo: El backend tiene problemas con la validación de acompañantes
+        // Para habilitar en el futuro, descomentar la siguiente línea:
+        // acompanantes: acompanantesData,
+        notas: datosReserva.solicitudesEspeciales || ""
+      }
+
+      console.log("📝 Enviando reserva:", reservaData)
+      console.log("🧪 NOTA: Enviando SIN acompañantes (basado en problema identificado en edición)")
+      console.log("🔄 ESTRUCTURA: Usando formato de detalles simplificado que funciona en admin")
+
+      const response = await crearReserva(reservaData)
+      
+      console.log("✅ Reserva creada exitosamente:", response.data)
+      
+      // Generar número de reserva
+      const numeroReservaGenerado = `BOL-${response.data.id || Date.now()}`
+      setNumeroReserva(numeroReservaGenerado)
+      
+      setReservaCompletada(true)
+      
+      toast({
+        title: "¡Reserva Confirmada!",
+        description: `Tu reserva ${numeroReservaGenerado} ha sido creada exitosamente`,
+      })
+      
+    } catch (error: any) {
+      console.error("❌ Error al crear reserva:", error)
+      console.error("❌ Respuesta del servidor:", error.response?.data)
+      console.error("❌ Status code:", error.response?.status)
+      
+      // Mostrar error específico del backend si está disponible
+      let mensajeError = "Ha ocurrido un error inesperado";
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          mensajeError = error.response.data;
+        } else if (error.response.data.message) {
+          mensajeError = error.response.data.message;
+        } else if (error.response.data.detail) {
+          mensajeError = error.response.data.detail;
+        } else {
+          // Mostrar errores de validación específicos
+          const errores = Object.entries(error.response.data)
+            .map(([campo, mensajes]) => {
+              if (Array.isArray(mensajes)) {
+                return `${campo}: ${mensajes.join(', ')}`;
+              }
+              return `${campo}: ${mensajes}`;
+            })
+            .join('\n');
+          mensajeError = errores || "Error de validación en el backend";
+        }
+      }
+      
+      toast({
+        title: "Error al procesar reserva",
+        description: mensajeError,
+        variant: "destructive",
+      })
+    } finally {
+      setProcesandoReserva(false)
+    }
   }
 
   if (reservaCompletada) {
@@ -92,7 +231,10 @@ export default function PaginaReserva() {
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-muted-foreground">
-                <strong>Número de reserva:</strong> BOL-{Date.now()}
+                <strong>Número de reserva:</strong> {numeroReserva || `BOL-${Date.now()}`}
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Estado:</strong> Pendiente de confirmación
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

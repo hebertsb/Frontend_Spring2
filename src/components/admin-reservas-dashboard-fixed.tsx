@@ -555,7 +555,33 @@ const AdminReservasDashboard = () => {
   };
 
   const guardarCambios = async () => {
-    if (!editingReserva) return;
+    if (!editingReserva) {
+      console.error('❌ No hay reserva para editar');
+      return;
+    }
+    
+    if (!editingReserva.id) {
+      console.error('❌ ID de reserva inválido:', editingReserva.id);
+      toast({
+        title: "Error",
+        description: "No se puede editar: ID de reserva inválido",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Verificar token de autenticación
+    const token = localStorage.getItem('access');
+    if (!token) {
+      console.error('❌ No hay token de acceso disponible');
+      toast({
+        title: "Error de autenticación",
+        description: "Debes iniciar sesión para editar reservas",
+        variant: "destructive"
+      });
+      return;
+    }
+    console.log('✅ Token de acceso encontrado');
     
     // Validar los datos antes de enviar
     const validacion = validarDatosReserva(editingReserva);
@@ -569,31 +595,56 @@ const AdminReservasDashboard = () => {
     }
     
     try {
-      // Preparar los datos para la API - incluir campos requeridos por el backend
-      const datosActualizacion: any = {
-        estado: editingReserva.estado?.toUpperCase() || 'PENDIENTE', // Backend requiere mayúsculas
-        detalles: editingReserva.detalles || [], // Campo requerido por el backend
-        acompanantes: editingReserva.acompanantes || [], // Incluir acompañantes
-        total: editingReserva.precio?.toString() || editingReserva.total || "0", // Total como string
-      };
-
-      // Agregar fecha_inicio solo si ha cambiado
-      if (editingReserva.fecha_inicio) {
-        datosActualizacion.fecha_inicio = editingReserva.fecha_inicio;
+      console.log('🔍 DEBUG: Estructura actual de editingReserva:', {
+        id: editingReserva.id,
+        estado: editingReserva.estado,
+        detalles: editingReserva.detalles,
+        acompanantes: editingReserva.acompanantes,
+        total: editingReserva.total,
+        precio: editingReserva.precio,
+        fecha_inicio: editingReserva.fecha_inicio
+      });
+      
+      console.log('🔍 DETALLE acompañantes:', editingReserva.acompanantes);
+      console.log('🔍 Tipo de acompañantes:', typeof editingReserva.acompanantes);
+      console.log('🔍 Es array?:', Array.isArray(editingReserva.acompanantes));
+      if (editingReserva.acompanantes && editingReserva.acompanantes.length > 0) {
+        console.log('🔍 Primer acompañante:', editingReserva.acompanantes[0]);
       }
 
-      // Filtrar valores undefined/null
-      const datosLimpios = Object.fromEntries(
-        Object.entries(datosActualizacion).filter(([_, value]) => value != null && value !== '')
-      );
+      // Preparar los datos para la API - incluir campos requeridos por el backend
+      const acompanantesLimpios = editingReserva.acompanantes?.map((acomp: any, index: number) => ({
+        nombre: acomp.nombres || acomp.nombre || `Acompañante ${index + 1}`,
+        apellido: acomp.apellidos || acomp.apellido || `Apellido${index + 1}`, // No enviar vacío
+        fecha_nacimiento: acomp.fecha_nacimiento || "1990-01-01",
+        // Mantener campos adicionales si existen
+        ...(acomp.email && { email: acomp.email }),
+        ...(acomp.telefono && { telefono: acomp.telefono })
+      })) || [];
       
-      console.log('📤 Enviando datos de actualización (solo campos permitidos):', datosLimpios);
+      // OPCIÓN: Intentar sin acompañantes si hay problemas
+      const datosActualizacion = {
+        estado: editingReserva.estado?.toUpperCase() || 'PENDIENTE',
+        detalles: editingReserva.detalles || [],
+        fecha_inicio: editingReserva.fecha_inicio,
+        total: editingReserva.total || editingReserva.precio || 0,
+        // Comentar acompañantes temporalmente para probar
+        // acompanantes: acompanantesLimpios,
+      };
+
+      console.log('� Acompañantes originales:', editingReserva.acompanantes);
+      console.log('🔧 Acompañantes limpios:', acompanantesLimpios);
+      
+      console.log('�📤 Enviando datos completos de actualización:', datosActualizacion);
       console.log('📤 ID de reserva a editar:', editingReserva.id);
+      console.log('📤 Tipo del ID:', typeof editingReserva.id);
+      console.log('📤 ID como string:', String(editingReserva.id));
       console.log('📤 URL que se va a llamar:', `/reservas/${editingReserva.id}/`);
       
       // Llamar a la API para actualizar la reserva
       console.log("💾 Guardando cambios en el backend...");
-      const resultadoEdicion = await editarReserva(editingReserva.id, datosLimpios);
+      console.log("🧪 PRUEBA: Enviando SIN acompañantes para aislar el problema con acompañantes");
+      const resultadoEdicion = await editarReserva(String(editingReserva.id), datosActualizacion);
       console.log("✅ Cambios guardados en el backend exitosamente");
       console.log("📋 Resultado de la edición:", resultadoEdicion.data);
       
