@@ -10,6 +10,7 @@ import { TarjetaDestino } from "@/components/inicio/tarjeta-destino";
 import { ItemListaDestino } from "@/components/destinos/item-lista-destino";
 
 import { useState, useEffect } from "react";
+import { Servicio } from "@/lib/servicios";
 
 export default function PaginaDestinos() {
   const [filtros, setFiltros] = useState({
@@ -97,18 +98,8 @@ export default function PaginaDestinos() {
                   />
                 ) : (
                   <ItemListaDestino
-          
-                    datos={servicio} 
                     key={servicio.id}
-                    id={servicio.id}
-                    titulo={servicio.titulo}
-                    descripcion={servicio.descripcion_servicio}
-                    calificacion={servicio.calificacion || 0}
-                    imagenes={servicio.imagenes?.[0] || "/placeholder.svg"}
-                    costo={servicio.costo.toString()}
-                    duracion={servicio.dias.toString()}
-                    categoria={servicio.categoria?.nombre || "Sin categoría"}
-                    maxPersonas={servicio.max_personas}
+                    {...servicio}
                   />
                 )
               )}

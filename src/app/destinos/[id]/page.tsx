@@ -1,47 +1,47 @@
-// Importamos el router de Next.js
-import { destinosEjemplo } from "../destinosData";
-import { Navegacion } from "@/components/comunes/navegacion";
-import { DetailBreadcrumbs } from "@/components/comunes/breadcrumbs";
-import DetalleDestinoCliente from "./DetalleDestinoCliente";
-
 export async function generateStaticParams() {
+  // Agrega aquí todos los IDs de tus destinos
   return [
     { id: "1" },
     { id: "2" },
-    { id: "3" }
-    // Puedes agregar más ids aquí si tienes más destinos
+    { id: "3" },
   ];
 }
 
-export default async function Page({ params }: { params: { id: string } }) {
-  // Hacemos el fetch usando el id recibido por la URL
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, {
-    // Next.js recomienda usar cache: "no-store" para datos dinámicos
-    cache: "no-store",
-  });
+import { Navegacion } from "@/components/comunes/navegacion";
+import { PiePagina } from "@/components/comunes/pie-pagina";
+import DetalleDestinoCliente from "./DetalleDestinoCliente";
+import { Servicio } from "@/lib/servicios";
 
+export default async function Page({ params }: { params: { id: string } }) {
+  // Fetch de datos del destino
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, { cache: "no-store" });
   if (!res.ok) {
     return (
-      <>
+      <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
         <Navegacion />
-        <div className="p-8 text-center text-red-600">
-          Destino no encontrado.
+        <div className="max-w-4xl px-4 py-16 mx-auto text-center animate-fade-in">
+          <h1 className="mb-4 text-2xl font-bold font-heading text-foreground">
+            Destino no encontrado
+          </h1>
+          <PiePagina />
         </div>
-      </>
+      </div>
     );
   }
+  const destino: Servicio = await res.json();
 
-  const destino = await res.json();
-  console.log(destino)
-  return (
-    <>
-      <Navegacion />
-      <DetailBreadcrumbs
-        parentPage="Destinos"
-        parentHref="/destinos"
-        currentPageTitle={destino.titulo || "Detalle del Destino"}
-      />
-      <DetalleDestinoCliente destino={destino} />
-    </>
-  );
+return (
+  <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
+ 
+
+    {/* <pre className="p-4 m-4 bg-white rounded-lg shadow-md overflow-x-auto">
+      {JSON.stringify(destino, null, 2)}
+    </pre> */}
+
+    <DetalleDestinoCliente destino={destino}/>
+
+    <PiePagina />
+  </div>
+);
+
 }

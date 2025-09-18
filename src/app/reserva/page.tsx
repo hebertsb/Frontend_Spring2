@@ -13,8 +13,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Calendar, CreditCard, Shield, MapPin, CheckCircle, Phone, Mail, User } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+ import { Servicio } from "@/lib/servicios"
 
 /* ---------- Tipos fuertes para el estado ---------- */
 interface DatosReserva {
@@ -52,9 +53,22 @@ export default function PaginaReserva() {
 
   const nombrePaquete = searchParams?.get("nombre") || "Paquete seleccionado"
   const precioPaquete = searchParams?.get("precio") || "$0"
+  const idServicio = searchParams.get("id")
 
+
+  
+    const [servicio, setServicio] = useState<Servicio | null>(null)
+ 
   // Fecha mínima para la salida (evita recalcular en cada render)
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], [])
+
+  useEffect(() => {
+    if (idServicio) {
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${idServicio}`)
+        .then((res) => res.json())
+        .then((data) => setServicio(data))
+    }
+  }, [idServicio])
 
   /* ---------- Actualizador tipado por clave ---------- */
   const manejarCambio = <K extends keyof DatosReserva>(campo: K, valor: DatosReserva[K]) => {
@@ -116,7 +130,7 @@ export default function PaginaReserva() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in">
         {/* Header */}
         <div className="mb-8 animate-slide-up">
-          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-2">
+          <h1 className="font-heading font-black text-3xl lg:text-4xl text-foreground bg-gradient-to-r from-primary to-accent bg-clip-text  mb-2">
             Completa tu Reserva
           </h1>
           <p className="text-muted-foreground">Estás a un paso de vivir una experiencia inolvidable en Bolivia</p>

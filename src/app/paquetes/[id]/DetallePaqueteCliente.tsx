@@ -1,24 +1,19 @@
 "use client";
 
 import { DetailBreadcrumbs } from "@/components/comunes/breadcrumbs";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Star,
-  Heart,
-  Share2,
-  Clock,
-  Users,
-  Calendar,
-  MapPin,
-  CheckCircle,
-  XCircle,
-} from "lucide-react";
-import React, { useEffect, useState } from "react";
-import Image from "next/image";
 
-export default function DetallePaqueteCliente({ paquete }: { paquete: any }) {
+import React, { useEffect, useState } from "react";
+
+// Importa o define el tipo Paquete aquí
+// Ejemplo de importación (ajusta la ruta según tu proyecto):
+// import { Paquete } from "@/types/Paquete";
+
+type Paquete = {
+  nombre: string;
+  // Agrega aquí otras propiedades necesarias
+};
+
+export default function DetallePaqueteCliente({ paquete }: { paquete: Paquete | undefined }) {
   const [titulo, setTitulo] = useState("");
   useEffect(() => {
     if (paquete) setTitulo(paquete.nombre);

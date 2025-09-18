@@ -1,7 +1,7 @@
 "use client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin } from "lucide-react";
+import { Star } from "lucide-react";
 import Image from "next/image";
 import { Servicio } from "@/lib/servicios";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ interface PropsTarjetaDestino {
 export function TarjetaDestino({
   id,
   nombre,
-  ubicacion,
+  
   datos,
   descripcion,
   calificacion,
@@ -34,7 +34,7 @@ export function TarjetaDestino({
   const calificacionSegura = Math.max(0, Math.min(5, calificacion || 0));
 
   const handleVerDetalles = () => {
-    router.push(`/destinos/${id}`, { state: { datos } });
+    router.push(`/destinos/${id}`);
   };
 
   return (

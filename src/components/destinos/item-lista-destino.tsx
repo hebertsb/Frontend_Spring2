@@ -2,7 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Star, Clock, Users } from "lucide-react";
 import Link from "next/link";
-import { LoadingLink } from "../EfectoCarga/vista-cargando";
+// import { LoadingLink } from "../EfectoCarga/vista-cargando";
 import Image from "next/image";
 import {Servicio} from "@/lib/servicios"
 
@@ -11,7 +11,6 @@ export function ItemListaDestino({
   id,
   titulo,
   costo,  imagenes,
-
   descripcion,
   calificacion,
   categoria,
@@ -96,13 +95,11 @@ export function ItemListaDestino({
                 </div>
                 <div className="text-xs text-muted-foreground">por persona</div>
               </div>
-              <Button
-                as={Link}
-                href={`/destinos/${id}`}
-                className="w-full mt-2 bg-blue-500 text-white"
-              >
-                Ver detalles
-              </Button>
+              <Link href={`/destinos/${id}`} className="w-full">
+                <Button className="w-full mt-2 bg-blue-500 text-white">
+                  Ver detalles
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
