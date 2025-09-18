@@ -12,6 +12,10 @@ import {
 import { useSearchParams } from "next/navigation"
 import AdminDashboard from "@/components/admin-dashboard"
 import AdminReservasDashboard from "@/components/admin-reservas-dashboard-fixed"
+import AdminPoliticasDescuentosDashboard from "@/components/admin-politicas-descuentos-dashboard"
+// If the file exists with a different name or path, update the import accordingly.
+// Example:
+// import AdminPoliticasDescuentosDashboard from "@/components/AdminPoliticasDescuentosDashboard"
 import ProtectedRoute from "@/components/ProtectedRoute"
 
 import data from "./data.json"
@@ -44,6 +48,8 @@ export default function Page() {
                   <AdminDashboard />
                 ) : tab === "reservas" ? (
                   <AdminReservasDashboard />
+                ) : tab === "politicas" ? (
+                  <AdminPoliticasDescuentosDashboard />
                 ) : (
                   <>
                     <SectionCards />
