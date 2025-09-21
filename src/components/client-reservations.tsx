@@ -52,7 +52,7 @@ interface Reserva {
   estado: 'PENDIENTE' | 'PAGADA' | 'CANCELADA' | 'REPROGRAMADA';
   cupon: number | null;
   total: string;
-<<<<<<< HEAD
+
   detalles: Array<{
     titulo: string;
     tipo: string;
@@ -66,14 +66,14 @@ interface Reserva {
   notas?: string;
   moneda?: string;
   acompanantes?: any[];
-=======
+
   moneda: string;
   fecha_original?: string;
   fecha_reprogramacion?: string;
   motivo_reprogramacion?: string;
   numero_reprogramaciones: number;
   reprogramado_por?: number;
->>>>>>> cdb81af696d646f2150fff6febf0f0f7f4e840da
+
   created_at: string;
   updated_at: string;
   servicios: ReservaServicio[];
@@ -93,14 +93,14 @@ export default function ClientReservations() {
   const [reservaToCancel, setReservaToCancel] = useState<Reserva | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-<<<<<<< HEAD
+
   const [numeroTarjeta, setNumeroTarjeta] = useState("");
   const [fechaVencimiento, setFechaVencimiento] = useState("");
   const [cvv, setCvv] = useState("");
   const [guardarTarjeta, setGuardarTarjeta] = useState(false);
-=======
+
   const router = useRouter();
->>>>>>> cdb81af696d646f2150fff6febf0f0f7f4e840da
+ 
 
   // Cargar reservas del usuario
   const cargarReservas = async () => {
@@ -123,10 +123,10 @@ export default function ClientReservations() {
       
       // La respuesta de axios viene en response.data
       if (response.data && Array.isArray(response.data)) {
-<<<<<<< HEAD
+
         // Filtrar solo las reservas del usuario actual
         const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
-=======
+
         // Mostrar estructura de reservas para debug
         if (response.data.length > 0) {
           console.log('📋 Primera reserva ejemplo:', response.data[0]);
@@ -145,7 +145,7 @@ export default function ClientReservations() {
         }
         
         // Filtrar reservas considerando que usuario puede ser un objeto
->>>>>>> cdb81af696d646f2150fff6febf0f0f7f4e840da
+
         const reservasUsuario = response.data.filter(
           (reserva: Reserva) => {
             // Extraer ID del usuario dependiendo de la estructura
@@ -297,7 +297,7 @@ export default function ClientReservations() {
     return "/placeholder.jpg";
   };
 
-<<<<<<< HEAD
+
   const calcularDuracion = (detalles: any[]) => {
     if (detalles.length === 0) return "1 día";
     if (detalles.length > 3) return `${detalles.length} días`;
@@ -354,8 +354,8 @@ export default function ClientReservations() {
     }
   };
 
-=======
->>>>>>> cdb81af696d646f2150fff6febf0f0f7f4e840da
+
+
   // Función para abrir el modal de detalles
   const verDetallesReserva = (reserva: Reserva) => {
     setSelectedReserva(reserva);
