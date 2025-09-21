@@ -4,6 +4,12 @@ export async function generateStaticParams() {
     { id: "1" },
     { id: "2" },
     { id: "3" },
+    { id: "4" },
+    { id: "5" },
+    { id: "6" },
+    { id: "7" },
+    { id: "8" },
+    { id: "9" },
   ];
 }
 
@@ -11,12 +17,14 @@ import { Navegacion } from "@/components/comunes/navegacion";
 import { PiePagina } from "@/components/comunes/pie-pagina";
 import DetalleDestinoCliente from "./DetalleDestinoCliente";
 import { Servicio } from "@/lib/servicios";
+import { serviciosFallback } from "@/lib/servicios-fallback";
 
 export default async function Page({ params }: { params: { id: string } }) {
   let destino: Servicio | null = null;
   let error: string | null = null;
 
   try {
+    console.log("🔍 Buscando destino con ID:", params.id);
     // Fetch de datos del destino
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, { 
       cache: "no-store",
@@ -36,9 +44,17 @@ export default async function Page({ params }: { params: { id: string } }) {
     }
     
     destino = await res.json();
+    console.log("✅ Destino encontrado:", destino?.titulo);
   } catch (err) {
-    console.error('Error al cargar destino:', err);
-    error = err instanceof Error ? err.message : 'Error desconocido';
+    console.warn('⚠️ Error al cargar destino desde API, buscando en datos de fallback:', err);
+    // Buscar en datos de fallback
+    destino = serviciosFallback.find(s => s.id === params.id) || null;
+    if (destino) {
+      console.log("📦 Destino encontrado en fallback:", destino.titulo);
+    } else {
+      error = "Destino no encontrado";
+      console.error("❌ Destino no encontrado ni en API ni en fallback");
+    }
   }
 
   if (error || !destino) {

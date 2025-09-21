@@ -5,13 +5,13 @@ import axios from './axios';
 // ============================================
 
 // Obtener todas las políticas de servicios-descuentos
-export const listarServiciosDescuentos = () => axios.get('/servicios-descuentos/');
+export const listarServiciosDescuentos = () => axios.get('servicios-descuentos/');
 
 // Crear una nueva política (asignar descuento a servicio)
 export const crearServicioDescuento = async (data: any) => {
   try {
     console.log('🔄 API: Creando política servicio-descuento:', data);
-    const response = await axios.post('/servicios-descuentos/', data);
+    const response = await axios.post('servicios-descuentos/', data);
     console.log('✅ API: Política creada exitosamente:', response.data);
     return response;
   } catch (error: any) {
@@ -59,7 +59,7 @@ export const eliminarServicioDescuento = async (id: string) => {
 export const listarServicios = async () => {
   try {
     console.log('🔄 API: Solicitando lista de servicios...');
-    const response = await axios.get('/servicios/');
+    const response = await axios.get('servicios/');
     console.log('✅ API: Servicios obtenidos:', response.data);
     return response;
   } catch (error: any) {
@@ -77,7 +77,7 @@ export const listarServicios = async () => {
 export const listarDescuentos = async () => {
   try {
     console.log('🔄 API: Solicitando lista de descuentos...');
-    const response = await axios.get('/descuentos/');
+    const response = await axios.get('descuentos/');
     console.log('✅ API: Descuentos obtenidos:', response.data);
     return response;
   } catch (error: any) {
@@ -91,7 +91,7 @@ export const listarDescuentos = async () => {
 export const crearDescuento = async (data: any) => {
   try {
     console.log('🔄 API: Creando descuento:', data);
-    const response = await axios.post('/descuentos/', data);
+    const response = await axios.post('descuentos/', data);
     console.log('✅ API: Descuento creado exitosamente:', response.data);
     return response;
   } catch (error: any) {

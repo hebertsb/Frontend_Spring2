@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation';
 
 export async function generateStaticParams(): Promise<{ id: string }[]> {
   console.log('🔍 Generando rutas estáticas para paquetes:', paquetesData.map(p => p.id));
+  // Generar todas las rutas posibles para los paquetes
   return paquetesData.map((paquete: { id: string }) => ({ id: paquete.id }));
 }
 
