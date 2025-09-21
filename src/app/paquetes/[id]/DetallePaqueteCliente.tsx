@@ -77,17 +77,21 @@ export default function DetallePaqueteCliente({ paquete }: { paquete: any }) {
       return;
     }
 
-    // Convertir precio de bolivianos a formato esperado por la reserva
+    // Mantener precio en bolivianos sin conversión
     const precioNumerico = paquete.precio.replace(/[^\d]/g, ''); // Extraer solo números
-    const precioEnDolares = `$${Math.round(parseInt(precioNumerico) * 0.14)}`; // Conversión aproximada Bs a USD
+    const precioEnBolivianos = `Bs. ${precioNumerico}`; // Mantener en bolivianos
+
+    console.log('💰 Precio original:', paquete.precio);
+    console.log('💰 Precio para reserva:', precioEnBolivianos);
 
     // Redirigir a la página de reserva con los parámetros del paquete
     const params = new URLSearchParams({
+      servicio: paquete.id, // Usar 'servicio' en lugar de 'id'
       nombre: paquete.nombre,
-      precio: precioEnDolares,
-      id: paquete.id,
+      precio: precioEnBolivianos,
     });
     
+    console.log('🌐 URL de reserva:', `/reserva?${params.toString()}`);
     router.push(`/reserva?${params.toString()}`);
   };
 

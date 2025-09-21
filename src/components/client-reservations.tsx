@@ -1,32 +1,68 @@
 'use client'
 
 import React, { useState, useEffect } from "react";
-import { Calendar, User, Filter, Search, Clock, RefreshCw, X, MapPin, DollarSign } from "lucide-react";
+import { Calendar, User, Filter, Search, Clock, RefreshCw, X, MapPin, DollarSign, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { listarReservas, editarReserva } from "@/api/reservas";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
 
-// Tipos para las reservas
+// ========================================
+// INTERFACES ACTUALIZADAS SEGÚN BACKEND
+// ========================================
+
+interface Acompanante {
+  id: number;
+  documento: string;
+  nombre: string;
+  apellido: string;
+  fecha_nacimiento: string;
+  nacionalidad: string;
+  email: string;
+  telefono: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ReservaAcompanante {
+  id: number;
+  acompanante: Acompanante;
+  estado: string;
+  es_titular: boolean;
+}
+
+interface ReservaServicio {
+  id: number;
+  servicio: number;
+  nombre_servicio: string;
+  tipo_servicio: string;
+  cantidad_personas: number;
+  subtotal: string;
+  precio_unitario: string;
+  fecha_servicio: string;
+}
+
 interface Reserva {
   id: number;
+  usuario: number;
   fecha_inicio: string;
-  estado: string;
+  estado: 'PENDIENTE' | 'PAGADA' | 'CANCELADA' | 'REPROGRAMADA';
+  cupon: number | null;
   total: string;
-  detalles: Array<{
-    titulo: string;
-    tipo: string;
-    precio_unitario: string;
-    cantidad: number;
-  }>;
-  usuario?: {
-    id: number;
-    username: string;
-  };
-  notas?: string;
+  moneda: string;
+  fecha_original?: string;
+  fecha_reprogramacion?: string;
+  motivo_reprogramacion?: string;
+  numero_reprogramaciones: number;
+  reprogramado_por?: number;
   created_at: string;
+  updated_at: string;
+  servicios: ReservaServicio[];
+  acompanantes: ReservaAcompanante[];
+  notas?: string;
 }
 
 export default function ClientReservations() {
@@ -40,6 +76,7 @@ export default function ClientReservations() {
   const [reservaToCancel, setReservaToCancel] = useState<Reserva | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const router = useRouter();
 
   // Cargar reservas del usuario
   const cargarReservas = async () => {
@@ -54,17 +91,70 @@ export default function ClientReservations() {
 
     try {
       setLoading(true);
+      console.log('🔍 Usuario actual:', user);
+      console.log('🔍 ID del usuario:', user.id, 'Tipo:', typeof user.id);
+      
       const response = await listarReservas();
+      console.log('📋 Todas las reservas del backend:', response.data);
       
       // La respuesta de axios viene en response.data
       if (response.data && Array.isArray(response.data)) {
-        // Filtrar solo las reservas del usuario actual
-        // Convertir user.id a número para comparación
-        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+        // Mostrar estructura de reservas para debug
+        if (response.data.length > 0) {
+          console.log('📋 Primera reserva ejemplo:', response.data[0]);
+          console.log('📋 Usuario de la primera reserva:', response.data[0].usuario, 'Tipo:', typeof response.data[0].usuario);
+        }
+        
+        // Logging detallado para debug
+        console.log('🔍 Buscando reservas para userId:', user.id);
+        console.log('🔍 Total de reservas recibidas:', response.data.length);
+        
+        // Analizar estructura de las reservas
+        if (response.data.length > 0) {
+          console.log('📋 Primera reserva ejemplo completa:', response.data[0]);
+          console.log('📋 Campo usuario de primera reserva:', response.data[0].usuario);
+          console.log('📋 Tipo del campo usuario:', typeof response.data[0].usuario);
+        }
+        
+        // Filtrar reservas considerando que usuario puede ser un objeto
         const reservasUsuario = response.data.filter(
-          (reserva: Reserva) => reserva.usuario?.id === userId
+          (reserva: Reserva) => {
+            // Extraer ID del usuario dependiendo de la estructura
+            let reservaUserId;
+            
+            if (typeof reserva.usuario === 'object' && reserva.usuario !== null) {
+              // Si usuario es un objeto, buscar el campo id
+              reservaUserId = (reserva.usuario as any).id;
+              console.log(`🔍 Reserva ${reserva.id}: usuario es objeto con id=${reservaUserId}`);
+            } else {
+              // Si usuario es primitivo (número o string)
+              reservaUserId = reserva.usuario;
+              console.log(`🔍 Reserva ${reserva.id}: usuario es primitivo=${reservaUserId}`);
+            }
+            
+            // Comparaciones múltiples para asegurar compatibilidad
+            const userIdString = String(user.id);
+            const userIdNumber = Number(user.id);
+            const reservaUserIdString = String(reservaUserId);
+            const reservaUserIdNumber = Number(reservaUserId);
+            
+            const match = reservaUserIdNumber === userIdNumber || reservaUserIdString === userIdString;
+            
+            console.log(`🔍 Comparando: reservaUserId(${reservaUserId}) === userId(${user.id}) = ${match}`);
+            
+            return match;
+          }
         );
+        
+        console.log('✅ Reservas filtradas para el usuario:', reservasUsuario);
         setReservations(reservasUsuario);
+        
+        if (reservasUsuario.length === 0) {
+          toast({
+            title: "Información",
+            description: "No tienes reservas registradas",
+          });
+        }
       } else {
         setReservations([]);
         toast({
@@ -72,12 +162,32 @@ export default function ClientReservations() {
           description: "No tienes reservas registradas",
         });
       }
-    } catch (error) {
-      console.error('Error al cargar reservas:', error);
+    } catch (error: any) {
+      console.error('❌ Error al cargar reservas:', error);
+      
+      let mensajeError = "No se pudieron cargar las reservas";
+      
+      // Manejar errores específicos
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        mensajeError = "La carga de reservas está tomando más tiempo del esperado. Reintentando...";
+        console.log('⏰ Timeout detectado, reintentando en 3 segundos...');
+        
+        // Reintentar después de 3 segundos
+        setTimeout(() => {
+          console.log('🔄 Reintentando cargar reservas...');
+          cargarReservas();
+        }, 3000);
+      } else if (error.response?.status === 500) {
+        mensajeError = "Error del servidor. Intente nuevamente en unos momentos.";
+      } else if (error.response?.status === 401) {
+        mensajeError = "Su sesión ha expirado. Por favor, inicie sesión nuevamente.";
+      }
+      
       toast({
         title: "Error",
-        description: "No se pudieron cargar las reservas",
+        description: mensajeError,
         variant: "destructive",
+        duration: error.code === 'ECONNABORTED' ? 3000 : 5000,
       });
     } finally {
       setLoading(false);
@@ -91,31 +201,51 @@ export default function ClientReservations() {
   // Filtrar reservas según estado y búsqueda
   const reservasFiltradas = reservations.filter(reserva => {
     const cumpleFiltro = filtro === "todas" || reserva.estado.toLowerCase() === filtro.toLowerCase();
-    const cumpleBusqueda = reserva.detalles.some(detalle => 
-      detalle.titulo.toLowerCase().includes(busqueda.toLowerCase())
-    );
+    
+    // Buscar en ID de reserva, nombres de acompañantes o servicios
+    const terminoBusqueda = busqueda.toLowerCase();
+    const cumpleBusqueda = !terminoBusqueda || 
+      reserva.id.toString().includes(terminoBusqueda) ||
+      (reserva.acompanantes || []).some(ra => 
+        ra.acompanante.nombre.toLowerCase().includes(terminoBusqueda) ||
+        ra.acompanante.apellido.toLowerCase().includes(terminoBusqueda) ||
+        ra.acompanante.documento.toLowerCase().includes(terminoBusqueda)
+      ) ||
+      (reserva.servicios || []).some((servicio: ReservaServicio) => 
+                servicio.nombre_servicio?.toLowerCase().includes(busqueda.toLowerCase())
+      );
+    
     return cumpleFiltro && cumpleBusqueda;
   });
 
-  // Funciones helper
+  // Funciones helper actualizadas para estados del backend
   const getEstadoColor = (estado: string) => {
-    switch (estado.toLowerCase()) {
-      case "confirmada":
-      case "confirmado":
+    switch (estado.toUpperCase()) {
+      case "PAGADA":
         return "border-green-200 bg-green-50 text-green-700";
-      case "pendiente":
+      case "PENDIENTE":
         return "border-yellow-200 bg-yellow-50 text-yellow-700";
-      case "completada":
-      case "completado":
-        return "border-blue-200 bg-blue-50 text-blue-700";
-      case "cancelada":
-      case "cancelado":
+      case "CANCELADA":
         return "border-red-200 bg-red-50 text-red-700";
-      case "reprogramada":
-      case "reprogramado":
+      case "REPROGRAMADA":
         return "border-purple-200 bg-purple-50 text-purple-700";
       default:
         return "border-gray-200 bg-gray-50 text-gray-700";
+    }
+  };
+
+  const getEstadoTexto = (estado: string) => {
+    switch (estado.toUpperCase()) {
+      case "PAGADA":
+        return "Pagada";
+      case "PENDIENTE":
+        return "Pendiente";
+      case "CANCELADA":
+        return "Cancelada";
+      case "REPROGRAMADA":
+        return "Reprogramada";
+      default:
+        return estado;
     }
   };
 
@@ -136,13 +266,6 @@ export default function ClientReservations() {
     if (titulo.toLowerCase().includes("potosí")) return "/bolivia-tour-uyuni-titicaca.png";
     if (titulo.toLowerCase().includes("la paz")) return "/bolivia-andes-trekking.png";
     return "/placeholder.jpg";
-  };
-
-  const calcularDuracion = (detalles: any[]) => {
-    if (detalles.length === 0) return "1 día";
-    if (detalles.length > 3) return `${detalles.length} días`;
-    if (detalles.length > 1) return `${detalles.length} días`;
-    return "1 día";
   };
 
   // Función para abrir el modal de detalles
@@ -170,23 +293,30 @@ export default function ClientReservations() {
     try {
       setLoading(true);
 
-      // Preparar datos para cancelar (cambiar estado a cancelada)
+      // Preparar datos completos para cancelar - incluir TODOS los campos de la reserva original
       const datosActualizados = {
-        estado: "cancelada",
+        // Campos obligatorios del sistema
+        estado: "CANCELADA",
         fecha_inicio: reservaToCancel.fecha_inicio,
         total: reservaToCancel.total,
-        notas: reservaToCancel.notas ? `${reservaToCancel.notas}\n\n[CANCELADA] Reserva cancelada por el cliente el ${new Date().toLocaleDateString('es-ES')}.` 
-               : `[CANCELADA] Reserva cancelada por el cliente el ${new Date().toLocaleDateString('es-ES')}.`,
-        detalles: reservaToCancel.detalles.map(detalle => ({
-          titulo: detalle.titulo,
-          tipo: detalle.tipo,
-          precio_unitario: detalle.precio_unitario,
-          cantidad: detalle.cantidad
-        }))
+        
+        // Servicios de la reserva
+        servicios: reservaToCancel.servicios,
+        
+        // Información del usuario
+        usuario: reservaToCancel.usuario || user?.id,
+        
+        // Notas actualizadas con motivo de cancelación
+        notas: reservaToCancel.notas 
+          ? `${reservaToCancel.notas}\n\n[CANCELADA] Reserva cancelada por el cliente el ${new Date().toLocaleDateString('es-ES')}.` 
+          : `[CANCELADA] Reserva cancelada por el cliente el ${new Date().toLocaleDateString('es-ES')}.`,
+        
+        // Campos adicionales que pueden ser requeridos por el backend
+        created_at: reservaToCancel.created_at
       };
 
       console.log('🔄 Cancelando reserva:', reservaToCancel.id);
-      console.log('🔄 Datos de cancelación:', datosActualizados);
+      console.log('🔄 Datos de cancelación completos:', datosActualizados);
 
       const response = await editarReserva(reservaToCancel.id.toString(), datosActualizados);
 
@@ -208,12 +338,23 @@ export default function ClientReservations() {
       }
     } catch (error: any) {
       console.error('❌ Error al cancelar reserva:', error);
+      console.error('❌ Response data:', error.response?.data);
+      console.error('❌ Request data que falló:', error.config?.data);
       
       let mensajeError = "No se pudo cancelar la reserva";
       if (error.response?.data?.detail) {
         mensajeError = error.response.data.detail;
       } else if (error.response?.data?.error) {
         mensajeError = error.response.data.error;
+      } else if (error.response?.data) {
+        // Si hay errores de validación específicos, mostrarlos
+        const errores = error.response.data;
+        if (typeof errores === 'object') {
+          const mensajes = Object.entries(errores).map(([campo, mensaje]) => 
+            `${campo}: ${Array.isArray(mensaje) ? mensaje.join(', ') : mensaje}`
+          ).join('\n');
+          mensajeError = `Errores de validación:\n${mensajes}`;
+        }
       } else if (error.message) {
         mensajeError = error.message;
       }
@@ -237,9 +378,16 @@ export default function ClientReservations() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <RefreshCw className="h-5 w-5 animate-spin text-blue-600" />
-          <span className="text-gray-600">Cargando tus reservas...</span>
+        <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-lg shadow-sm">
+          <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="text-center">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Cargando tus reservas...
+            </h3>
+            <p className="text-gray-600 text-sm">
+              Esto puede tomar unos momentos mientras recuperamos toda la información
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -282,10 +430,10 @@ export default function ClientReservations() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="todas">Todas las reservas</option>
-              <option value="confirmada">Confirmadas</option>
+              <option value="pagada">Pagadas</option>
               <option value="pendiente">Pendientes</option>
-              <option value="completada">Completadas</option>
               <option value="cancelada">Canceladas</option>
+              <option value="reprogramada">Reprogramadas</option>
             </select>
           </div>
         </div>
@@ -295,9 +443,22 @@ export default function ClientReservations() {
       <div className="grid gap-6">
         {reservasFiltradas.length > 0 ? (
           reservasFiltradas.map((reserva) => {
-            const primerDetalle = reserva.detalles[0];
-            const destinoPrincipal = primerDetalle?.titulo || "Destino";
-            const totalPersonas = primerDetalle?.cantidad || 1;
+            // Obtener información del titular con validación segura
+            const acompanantes = reserva.acompanantes || [];
+            const servicios = reserva.servicios || [];
+            
+            const titular = acompanantes.find(ra => ra.es_titular);
+            const nombreTitular = titular ? `${titular.acompanante.nombre} ${titular.acompanante.apellido}` : 'N/A';
+            const totalPersonas = acompanantes.length;
+            const totalServicios = servicios.length;
+            
+            console.log('🔍 Datos de reserva:', {
+              id: reserva.id,
+              acompanantes: acompanantes,
+              servicios: servicios,
+              totalPersonas,
+              totalServicios
+            });
             
             return (
               <div key={reserva.id} className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow">
@@ -305,8 +466,8 @@ export default function ClientReservations() {
                   {/* Imagen */}
                   <div className="md:w-64 h-48 md:h-auto">
                     <img
-                      src={obtenerImagenDestino(destinoPrincipal)}
-                      alt={destinoPrincipal}
+                      src={obtenerImagenDestino(`Reserva ${reserva.id}`)}
+                      alt={`Reserva ${reserva.id}`}
                       className="w-full h-full object-cover rounded-t-xl md:rounded-l-xl md:rounded-t-none"
                     />
                   </div>
@@ -316,24 +477,26 @@ export default function ClientReservations() {
                     <div className="flex flex-col md:flex-row justify-between items-start mb-4">
                       <div>
                         <h3 className="text-xl font-bold text-gray-900 mb-2">
-                          {destinoPrincipal}
+                          Reserva #{reserva.id}
                         </h3>
+                        <p className="text-gray-600 mb-2">Titular: {nombreTitular}</p>
                         <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getEstadoColor(reserva.estado)}`}>
-                          {reserva.estado.charAt(0).toUpperCase() + reserva.estado.slice(1)}
+                          {getEstadoTexto(reserva.estado)}
                         </div>
-                        {reserva.detalles.length > 1 && (
+                        {totalServicios > 1 && (
                           <div className="mt-2">
                             <Badge variant="secondary" className="text-xs">
-                              +{reserva.detalles.length - 1} actividad{reserva.detalles.length > 2 ? 'es' : ''} más
+                              {totalServicios} servicio{totalServicios > 1 ? 's' : ''}
                             </Badge>
                           </div>
                         )}
                       </div>
                       <div className="text-right mt-4 md:mt-0">
                         <div className="text-2xl font-bold text-blue-600">
-                          ${parseFloat(reserva.total).toFixed(2)}
+                          {reserva.moneda === 'USD' ? '$' : 'Bs. '}
+                          {parseFloat(reserva.total).toFixed(2)}
                         </div>
-                        <div className="text-sm text-gray-500">USD</div>
+                        <div className="text-sm text-gray-500">{reserva.moneda}</div>
                       </div>
                     </div>
 
@@ -350,39 +513,44 @@ export default function ClientReservations() {
                       <div className="flex items-center gap-2 text-gray-600">
                         <Clock className="w-4 h-4" />
                         <div>
-                          <div className="text-xs text-gray-500">Duración</div>
-                          <div className="text-sm font-medium">{calcularDuracion(reserva.detalles)}</div>
+                          <div className="text-xs text-gray-500">Servicios</div>
+                          <div className="text-sm font-medium">{totalServicios} servicio{totalServicios > 1 ? 's' : ''}</div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 text-gray-600">
                         <User className="w-4 h-4" />
                         <div>
-                          <div className="text-xs text-gray-500">Huéspedes</div>
+                          <div className="text-xs text-gray-500">Acompañantes</div>
                           <div className="text-sm font-medium">{totalPersonas} persona{totalPersonas > 1 ? 's' : ''}</div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Fecha de reserva y notas */}
+                    {/* Información adicional */}
                     <div className="text-xs text-gray-500 mb-4">
                       <div>Reservado el {formatFecha(reserva.created_at)}</div>
-                      {reserva.notas && (
+                      {reserva.numero_reprogramaciones > 0 && (
+                        <div className="mt-1 text-orange-600">
+                          <strong>Reprogramaciones:</strong> {reserva.numero_reprogramaciones}
+                        </div>
+                      )}
+                      {reserva.motivo_reprogramacion && (
                         <div className="mt-1 text-gray-600">
-                          <strong>Notas:</strong> {reserva.notas}
+                          <strong>Motivo:</strong> {reserva.motivo_reprogramacion}
                         </div>
                       )}
                     </div>
 
-                    {/* Lista de actividades si hay múltiples */}
-                    {reserva.detalles.length > 1 && (
+                    {/* Lista de servicios si hay múltiples */}
+                    {servicios.length > 1 && (
                       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                        <h4 className="text-sm font-medium text-gray-900 mb-2">Actividades incluidas:</h4>
+                        <h4 className="text-sm font-medium text-gray-900 mb-2">Servicios incluidos:</h4>
                         <ul className="text-sm text-gray-600 space-y-1">
-                          {reserva.detalles.map((detalle, index) => (
+                          {servicios.map((servicio: ReservaServicio, index: number) => (
                             <li key={index} className="flex justify-between">
-                              <span>• {detalle.titulo}</span>
-                              <span className="font-medium">${parseFloat(detalle.precio_unitario).toFixed(2)}</span>
+                              <span>• {servicio.nombre_servicio} (x{servicio.cantidad_personas})</span>
+                              <span className="font-medium">{reserva.moneda === 'USD' ? '$' : 'Bs. '}{parseFloat(servicio.precio_unitario).toFixed(2)}</span>
                             </li>
                           ))}
                         </ul>
@@ -398,7 +566,7 @@ export default function ClientReservations() {
                       >
                         Ver Detalles
                       </Button>
-                      {(reserva.estado.toLowerCase() === "confirmada" || reserva.estado.toLowerCase() === "confirmado") && (
+                      {reserva.estado.toUpperCase() === "PAGADA" && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -407,9 +575,8 @@ export default function ClientReservations() {
                           Modificar
                         </Button>
                       )}
-                      {(reserva.estado.toLowerCase() === "confirmada" || 
-                        reserva.estado.toLowerCase() === "confirmado" || 
-                        reserva.estado.toLowerCase() === "pendiente") && (
+                      {(reserva.estado.toUpperCase() === "PAGADA" || 
+                        reserva.estado.toUpperCase() === "PENDIENTE") && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -440,13 +607,13 @@ export default function ClientReservations() {
             </p>
             <div className="flex gap-3 justify-center">
               <Button 
-                onClick={() => window.location.href = '/destinos'}
+                onClick={() => router.push('/destinos')}
                 className="bg-blue-600 hover:bg-blue-700"
               >
                 Explorar Destinos
               </Button>
               <Button 
-                onClick={() => window.location.href = '/paquetes'}
+                onClick={() => router.push('/paquetes')}
                 variant="outline"
               >
                 Ver Paquetes
@@ -513,7 +680,11 @@ export default function ClientReservations() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Usuario:</span>
-                      <span className="font-medium">{selectedReserva.usuario?.username || 'N/A'}</span>
+                      <span className="font-medium">
+                        {/* Buscar el titular en los acompañantes */}
+                        {selectedReserva.acompanantes?.find(ra => ra.es_titular)?.acompanante?.nombre || 
+                         `Usuario ID: ${selectedReserva.usuario}`}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -526,10 +697,10 @@ export default function ClientReservations() {
                       <span>${parseFloat(selectedReserva.total).toFixed(2)} USD</span>
                     </div>
                     <div className="text-sm text-gray-600">
-                      Total por {selectedReserva.detalles.reduce((sum, detalle) => sum + detalle.cantidad, 0)} persona(s)
+                      Total acompañantes: {(selectedReserva.acompanantes || []).length} persona(s)
                     </div>
                     <div className="text-sm text-gray-600">
-                      Duración estimada: {calcularDuracion(selectedReserva.detalles)}
+                      Servicios contratados: {(selectedReserva.servicios || []).length} servicio(s)
                     </div>
                   </div>
                 </div>
@@ -539,33 +710,33 @@ export default function ClientReservations() {
               <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <MapPin className="w-5 h-5" />
-                  Actividades y Destinos
+                  Servicios y Destinos
                 </h3>
                 <div className="grid gap-4">
-                  {selectedReserva.detalles.map((detalle, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  {(selectedReserva.servicios || []).map((servicio, index) => (
+                    <div key={servicio.id || index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <img
-                              src={obtenerImagenDestino(detalle.titulo)}
-                              alt={detalle.titulo}
+                              src={obtenerImagenDestino(servicio.nombre_servicio)}
+                              alt={servicio.nombre_servicio}
                               className="w-16 h-16 object-cover rounded-lg"
                             />
                             <div>
-                              <h4 className="font-semibold text-gray-900">{detalle.titulo}</h4>
-                              <p className="text-sm text-gray-600 capitalize">{detalle.tipo}</p>
-                              <p className="text-sm text-gray-600">{detalle.cantidad} persona(s)</p>
+                              <h4 className="font-semibold text-gray-900">{servicio.nombre_servicio}</h4>
+                              <p className="text-sm text-gray-600 capitalize">{servicio.tipo_servicio}</p>
+                              <p className="text-sm text-gray-600">{servicio.cantidad_personas} persona(s)</p>
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="text-lg font-semibold text-gray-900">
-                            ${parseFloat(detalle.precio_unitario).toFixed(2)}
+                            ${parseFloat(servicio.precio_unitario).toFixed(2)}
                           </div>
                           <div className="text-sm text-gray-600">por persona</div>
                           <div className="text-sm font-medium text-blue-600">
-                            Subtotal: ${(parseFloat(detalle.precio_unitario) * detalle.cantidad).toFixed(2)}
+                            Subtotal: ${parseFloat(servicio.subtotal).toFixed(2)}
                           </div>
                         </div>
                       </div>
@@ -573,6 +744,44 @@ export default function ClientReservations() {
                   ))}
                 </div>
               </div>
+
+              {/* Acompañantes */}
+              {selectedReserva.acompanantes && selectedReserva.acompanantes.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Acompañantes ({(selectedReserva.acompanantes || []).length})
+                  </h3>
+                  <div className="grid gap-3">
+                    {(selectedReserva.acompanantes || []).map((acompanante, index) => (
+                      <div key={acompanante.id || index} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h5 className="font-medium text-gray-900">
+                                {acompanante.acompanante.nombre} {acompanante.acompanante.apellido}
+                              </h5>
+                              {acompanante.es_titular && (
+                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                  Titular
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-600 space-y-1">
+                              <p>Documento: {acompanante.acompanante.documento}</p>
+                              <p>Teléfono: {acompanante.acompanante.telefono}</p>
+                              <p>Email: {acompanante.acompanante.email}</p>
+                              {acompanante.acompanante.fecha_nacimiento && (
+                                <p>Fecha de nacimiento: {acompanante.acompanante.fecha_nacimiento}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Notas adicionales */}
               {selectedReserva.notas && (
@@ -593,7 +802,7 @@ export default function ClientReservations() {
                 >
                   Cerrar
                 </Button>
-                {(selectedReserva.estado.toLowerCase() === "confirmada" || selectedReserva.estado.toLowerCase() === "confirmado") && (
+                {(selectedReserva.estado.toUpperCase() === "PAGADA") && (
                   <Button
                     variant="outline"
                     className="flex-1 md:flex-none"
@@ -605,9 +814,8 @@ export default function ClientReservations() {
                     Modificar Reserva
                   </Button>
                 )}
-                {(selectedReserva.estado.toLowerCase() === "confirmada" || 
-                  selectedReserva.estado.toLowerCase() === "confirmado" || 
-                  selectedReserva.estado.toLowerCase() === "pendiente") && (
+                {(selectedReserva.estado.toUpperCase() === "PAGADA" || 
+                  selectedReserva.estado.toUpperCase() === "PENDIENTE") && (
                   <Button
                     variant="destructive"
                     className="flex-1 md:flex-none"
@@ -650,7 +858,8 @@ export default function ClientReservations() {
                     </span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    <p>Destino: {reservaToCancel.detalles[0]?.titulo}</p>
+                    <p>Servicios: {reservaToCancel.servicios.length} servicio(s)</p>
+                    <p>Acompañantes: {reservaToCancel.acompanantes.length} persona(s)</p>
                     <p>Fecha: {formatFecha(reservaToCancel.fecha_inicio)}</p>
                     <p>Estado: {reservaToCancel.estado}</p>
                   </div>

@@ -21,14 +21,16 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
 
-export default function DetalleDestinoCliente({ destino }: { destino: any }) {
+import { Servicio } from "@/lib/servicios";
+
+export default function DetalleDestinoCliente({ destino }: { destino: Servicio }) {
   const [esFavorito, setEsFavorito] = useState(false);
   const [titulo, setTitulo] = useState("");
   const router = useRouter();
 
   useEffect(() => {
     if (destino) {
-      setTitulo(destino.nombre);
+      setTitulo(destino.titulo);
     }
   }, [destino]);
 
@@ -37,8 +39,8 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
     toast({
       title: esFavorito ? "Eliminado de favoritos" : "Agregado a favoritos",
       description: esFavorito 
-        ? `${destino?.nombre} ha sido eliminado de tus favoritos`
-        : `${destino?.nombre} ha sido agregado a tus favoritos`,
+        ? `${destino?.titulo} ha sido eliminado de tus favoritos`
+        : `${destino?.titulo} ha sido agregado a tus favoritos`,
     });
   };
 
@@ -46,8 +48,8 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: destino?.nombre,
-          text: destino?.descripcion,
+          title: destino?.titulo,
+          text: destino?.descripcion_servicio,
           url: window.location.href,
         });
       } catch (error) {
@@ -75,9 +77,9 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
 
     // Redirigir a la página de reserva con los parámetros del destino
     const params = new URLSearchParams({
-      nombre: destino.nombre,
-      precio: destino.precio,
-      id: destino.id,
+      servicio: destino.id, // Usar 'servicio' en lugar de 'id'
+      nombre: destino.titulo,
+      precio: destino.costo.toString(),
     });
     
     router.push(`/reserva?${params.toString()}`);
@@ -111,8 +113,8 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
           {/* Imagen principal */}
           <div className="relative">
             <Image
-              src={destino.imagen}
-              alt={destino.nombre}
+              src={destino.imagenes?.[0] || "/placeholder.svg"}
+              alt={destino.titulo}
               width={600}
               height={400}
               className="w-full h-[400px] object-cover rounded-2xl shadow-lg"
@@ -143,22 +145,22 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                  {destino.categoria}
+                  {destino.categoria?.nombre || destino.tipo}
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{destino.calificacion}</span>
+                  <span className="font-medium">{destino.calificacion || 0}</span>
                 </div>
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{destino.nombre}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{destino.titulo}</h1>
               <div className="flex items-center gap-2 text-gray-600">
                 <MapPin className="h-4 w-4" />
-                <span>{destino.ubicacion}</span>
+                <span>{destino.categoria?.nombre || "Destino turístico"}</span>
               </div>
             </div>
 
             <p className="text-gray-700 text-lg leading-relaxed">
-              {destino.descripcion}
+              {destino.descripcion_servicio}
             </p>
 
             {/* Detalles rápidos */}
@@ -167,14 +169,14 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
                 <Clock className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Duración</p>
-                  <p className="font-medium">{destino.duracion}</p>
+                  <p className="font-medium">{destino.dias} día{destino.dias > 1 ? 's' : ''}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
                 <Users className="h-5 w-5 text-green-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Máx. personas</p>
-                  <p className="font-medium">{destino.maxPersonas}</p>
+                  <p className="text-sm text-gray-600">Tipo</p>
+                  <p className="font-medium">{destino.tipo}</p>
                 </div>
               </div>
             </div>
@@ -184,7 +186,7 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-600">Precio por persona</p>
-                  <p className="text-3xl font-bold text-blue-700">{destino.precio}</p>
+                  <p className="text-3xl font-bold text-blue-700">Bs. {destino.costo}</p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
               </div>
@@ -207,48 +209,57 @@ export default function DetalleDestinoCliente({ destino }: { destino: any }) {
               Qué incluye
             </h3>
             <ul className="space-y-2 text-gray-700">
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Transporte ida y vuelta
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Guía especializado
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Entradas a sitios turísticos
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Seguro de viaje
-              </li>
+              {destino.incluido && destino.incluido.length > 0 ? (
+                destino.incluido.map((item, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    {item}
+                  </li>
+                ))
+              ) : (
+                <>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Guía especializado
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Entradas incluidas
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Transporte básico
+                  </li>
+                </>
+              )}
             </ul>
           </Card>
 
           <Card className="p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              No incluye
+              Descripción adicional
             </h3>
-            <ul className="space-y-2 text-gray-700">
-              <li className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-500" />
-                Alimentación
-              </li>
-              <li className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-500" />
-                Hospedaje
-              </li>
-              <li className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-500" />
-                Gastos personales
-              </li>
-              <li className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 text-red-500" />
-                Propinas
-              </li>
-            </ul>
+            <div className="text-gray-700">
+              {destino.descripcion ? (
+                <p>{destino.descripcion}</p>
+              ) : (
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Alimentación no incluida
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Gastos personales
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Propinas opcionales
+                  </li>
+                </ul>
+              )}
+            </div>
           </Card>
         </div>
       </div>

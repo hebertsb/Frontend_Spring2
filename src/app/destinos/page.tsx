@@ -11,6 +11,7 @@ import { ItemListaDestino } from "@/components/destinos/item-lista-destino";
 
 import { useState, useEffect } from "react";
 import { Servicio } from "@/lib/servicios";
+import { serviciosFallback } from "@/lib/servicios-fallback";
 
 export default function PaginaDestinos() {
   const [filtros, setFiltros] = useState({
@@ -24,6 +25,7 @@ export default function PaginaDestinos() {
   const [ordenarPor, setOrdenarPor] = useState("relevancia");
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [Servicios, setServicios] = useState<Servicio[]>([]); // Estado tipado como Servicio[]
+  const [cargando, setCargando] = useState(true);
 
   const manejarLimpiarFiltros = () => {
     setFiltros({
@@ -34,12 +36,20 @@ export default function PaginaDestinos() {
     });
   };
 
-  // Fetch de servicios desde la API
+  // Fetch de servicios desde la API con fallback
   useEffect(() => {
     const fetchServicios = async () => {
+      setCargando(true);
       try {
+        console.log("🌍 Intentando cargar servicios desde API...");
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/servicios/`
+          `${process.env.NEXT_PUBLIC_API_URL}/api/servicios/`,
+          {
+            cache: 'no-store',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          }
         );
         
         if (!response.ok) {
@@ -52,11 +62,15 @@ export default function PaginaDestinos() {
         }
         
         const data: Servicio[] = await response.json();
+        console.log(`✅ Servicios cargados desde API: ${data.length} elementos`);
         setServicios(data);
       } catch (error) {
-        console.error('Error al cargar servicios:', error);
-        // En caso de error, usar datos vacíos o de respaldo
-        setServicios([]);
+        console.warn('⚠️ Error al cargar servicios desde API, usando datos de fallback:', error);
+        // En caso de error, usar datos de fallback
+        console.log(`📦 Usando datos de fallback: ${serviciosFallback.length} servicios`);
+        setServicios(serviciosFallback);
+      } finally {
+        setCargando(false);
       }
     };
 
@@ -91,38 +105,47 @@ export default function PaginaDestinos() {
             />
 
             {/* Resultados */}
-            <div
-              className={
-                vistaActual === "grid"
-                  ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
-                  : "space-y-6"
-              }
-            >
-              {Servicios.map((servicio) =>
-                vistaActual === "grid" ? (
-                  <TarjetaDestino
-                    // datos={servicio} // <-- aquí pasas todo el objeto
-                    key={servicio.id}
-                    id={servicio.id}
-                    nombre={servicio.titulo}
-                    ubicacion={servicio.categoria?.nombre || "Sin ubicación"}
-                    descripcion={servicio.descripcion_servicio}
-                    calificacion={servicio.calificacion || 0}
-                    urlImagen={servicio.imagenes?.[0] || "/placeholder.svg"}
-                    precio={servicio.costo.toString()}
-                    duracion={servicio.dias.toString()}
-                  />
-                ) : (
-                  <ItemListaDestino
-                    key={servicio.id}
-                    {...servicio}
-                  />
-                )
-              )}
-            </div>
+            {cargando ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Cargando destinos...</p>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={
+                  vistaActual === "grid"
+                    ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
+                    : "space-y-6"
+                }
+              >
+                {Servicios.map((servicio) =>
+                  vistaActual === "grid" ? (
+                    <TarjetaDestino
+                      // datos={servicio} // <-- aquí pasas todo el objeto
+                      key={servicio.id}
+                      id={servicio.id}
+                      nombre={servicio.titulo}
+                      ubicacion={servicio.categoria?.nombre || "Sin ubicación"}
+                      descripcion={servicio.descripcion_servicio}
+                      calificacion={servicio.calificacion || 0}
+                      urlImagen={servicio.imagenes?.[0] || "/placeholder.svg"}
+                      precio={servicio.costo.toString()}
+                      duracion={servicio.dias.toString()}
+                    />
+                  ) : (
+                    <ItemListaDestino
+                      key={servicio.id}
+                      {...servicio}
+                    />
+                  )
+                )}
+              </div>
+            )}
 
             {/* Sin resultados */}
-            {Servicios.length === 0 && (
+            {!cargando && Servicios.length === 0 && (
               <div className="py-16 text-center bg-white border shadow-sm rounded-xl border-amber-200">
                 <div className="max-w-md mx-auto">
                   <h3 className="mb-3 text-2xl font-bold text-gray-800 font-heading">
