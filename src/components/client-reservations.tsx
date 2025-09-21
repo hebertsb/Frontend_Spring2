@@ -26,12 +26,15 @@ interface Reserva {
     username: string;
   };
   notas?: string;
+  moneda?: string;
+  acompanantes?: any[];
   created_at: string;
 }
 
 export default function ClientReservations() {
   const [reservations, setReservations] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false); // nuevo
   const [filtro, setFiltro] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
@@ -40,6 +43,10 @@ export default function ClientReservations() {
   const [reservaToCancel, setReservaToCancel] = useState<Reserva | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
+  const [numeroTarjeta, setNumeroTarjeta] = useState("");
+  const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [guardarTarjeta, setGuardarTarjeta] = useState(false);
 
   // Cargar reservas del usuario
   const cargarReservas = async () => {
@@ -59,7 +66,6 @@ export default function ClientReservations() {
       // La respuesta de axios viene en response.data
       if (response.data && Array.isArray(response.data)) {
         // Filtrar solo las reservas del usuario actual
-        // Convertir user.id a número para comparación
         const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
         const reservasUsuario = response.data.filter(
           (reserva: Reserva) => reserva.usuario?.id === userId
@@ -145,10 +151,64 @@ export default function ClientReservations() {
     return "1 día";
   };
 
+  // Helpers de tarjeta
+  const onlyDigits = (s: string) => s.replace(/\D/g, "");
+  const validarTarjeta = (): { ok: boolean; mensaje?: string } => {
+    const num = onlyDigits(numeroTarjeta);
+    if (num.length !== 16) return { ok: false, mensaje: "El número de tarjeta debe tener 16 dígitos" };
+
+    // Fecha MM/AA
+    const mmYY = fechaVencimiento.replace(/\s/g, "");
+    if (!/^\d{2}\/\d{2}$/.test(mmYY)) return { ok: false, mensaje: "Formato de fecha debe ser MM/AA" };
+
+    const [mmStr, yyStr] = mmYY.split("/");
+    const mm = parseInt(mmStr, 10);
+    const yy = parseInt(yyStr, 10);
+    if (mm < 1 || mm > 12) return { ok: false, mensaje: "Mes inválido" };
+
+    // año actual (2 dígitos)
+    const now = new Date();
+    const currentYY = parseInt(now.getFullYear().toString().slice(-2), 10);
+    const currentMM = now.getMonth() + 1;
+    if (yy < currentYY || (yy === currentYY && mm < currentMM)) return { ok: false, mensaje: "Tarjeta vencida" };
+
+    // CVV
+    if (!/^\d{3,4}$/.test(cvv)) return { ok: false, mensaje: "CVV inválido" };
+
+    return { ok: true };
+  };
+
+  const maskCard = (num: string) => {
+    const digits = onlyDigits(num);
+    const last4 = digits.slice(-4);
+    return `**** **** **** ${last4}`;
+  };
+
+  const saveCardLocal = (cardToken: string, cardNumber: string) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem("saved_cards") || "[]");
+      const toSave = {
+        token: cardToken,
+        masked: maskCard(cardNumber),
+        saved_at: new Date().toISOString(),
+        userId: user?.id ?? null,
+      };
+      existing.push(toSave);
+      localStorage.setItem("saved_cards", JSON.stringify(existing));
+    } catch (e) {
+      console.warn("No se pudo guardar tarjeta localmente:", e);
+    }
+  };
+
   // Función para abrir el modal de detalles
   const verDetallesReserva = (reserva: Reserva) => {
     setSelectedReserva(reserva);
     setShowModal(true);
+    // reset campos de pago (opc)
+    setNumeroTarjeta("");
+    setFechaVencimiento("");
+    setCvv("");
+    setGuardarTarjeta(false);
   };
 
   // Función para cerrar el modal
@@ -225,6 +285,77 @@ export default function ClientReservations() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Función principal del pago (simulada)
+  const handlePayNow = async () => {
+    if (!selectedReserva) return;
+
+    // Validación
+    const v = validarTarjeta();
+    if (!v.ok) {
+      toast({
+        title: "Datos inválidos",
+        description: v.mensaje || "Revisa los datos de la tarjeta",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+
+      // Simular tokenización en gateway
+      await new Promise((r) => setTimeout(r, 800));
+      const fakeToken = "tok_" + Math.random().toString(36).substring(2, 12);
+
+      // Si el usuario quiere guardar la tarjeta, lo guardamos localmente (simulado)
+      if (guardarTarjeta) {
+        saveCardLocal(fakeToken, numeroTarjeta);
+      }
+
+      // Simular cobro en pasarela
+      await new Promise((r) => setTimeout(r, 900));
+
+      // Actualizar estado de la reserva en backend (ej: confirmada)
+      // Solo enviamos el campo que el backend espera (según tu API)
+      const response = await editarReserva(selectedReserva.id.toString(), {
+        estado: "confirmada", // cambia según tu flujo si quieres 'pagada' u otro
+      });
+
+      if (response.status === 200) {
+        toast({
+          title: "Pago exitoso",
+          description: `Tu reserva #${selectedReserva.id} fue pagada con tarjeta terminada en ${numeroTarjeta.slice(-4)}.`,
+        });
+
+        // limpiar campos
+        setNumeroTarjeta("");
+        setFechaVencimiento("");
+        setCvv("");
+        setGuardarTarjeta(false);
+
+        // Recargar reservas y cerrar modal
+        await cargarReservas();
+        cerrarModal();
+      } else {
+        console.error("Respuesta inesperada al actualizar reserva:", response);
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar la reserva después del pago",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("❌ Error en flujo de pago:", error);
+      toast({
+        title: "Error de pago",
+        description: error?.response?.data?.detail || "Ocurrió un error al procesar el pago",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -396,7 +527,7 @@ export default function ClientReservations() {
                         className="bg-blue-600 hover:bg-blue-700"
                         onClick={() => verDetallesReserva(reserva)}
                       >
-                        Ver Detalles
+                        Checkout
                       </Button>
                       {(reserva.estado.toLowerCase() === "confirmada" || reserva.estado.toLowerCase() === "confirmado") && (
                         <Button
@@ -475,7 +606,7 @@ export default function ClientReservations() {
           <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header del modal */}
             <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-900">Detalles de la Reserva</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Checkout de la Reserva</h2>
               <Button
                 variant="ghost"
                 size="sm"
@@ -488,136 +619,140 @@ export default function ClientReservations() {
 
             {/* Contenido del modal */}
             <div className="p-6">
-              {/* Información básica */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Información General</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">ID de Reserva:</span>
-                      <span className="font-medium">#{selectedReserva.id}</span>
+              <h3 className="text-xl font-bold mb-4">Confirmación de la Reserva</h3>
+
+              {/* Información general */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <h4 className="text-lg font-semibold mb-2">Información General</h4>
+                <p><strong>ID:</strong> #{selectedReserva.id}</p>
+                <p><strong>Estado:</strong> {selectedReserva.estado}</p>
+                <p><strong>Fecha de viaje:</strong> {formatFecha(selectedReserva.fecha_inicio)}</p>
+                <p><strong>Reservado el:</strong> {formatFecha(selectedReserva.created_at)}</p>
+                <p><strong>Usuario:</strong> {selectedReserva.usuario?.username || "N/A"}</p>
+              </div>
+
+              {/* Acompañantes */}
+              <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                <h4 className="text-lg font-semibold mb-2">Acompañantes</h4>
+                {selectedReserva.acompanantes && selectedReserva.acompanantes.length > 0 ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {selectedReserva.acompanantes.map((a, index) => (
+                      <li key={index}>
+                        {a.nombre} {a.apellido} ({a.documento})
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-600 italic">No hay acompañantes registrados</p>
+                )}
+              </div>
+
+              {/* Detalles y costos */}
+              <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                <h4 className="text-lg font-semibold mb-2">Resumen de Costos</h4>
+                {selectedReserva.detalles.map((detalle, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span>{detalle.titulo} x {detalle.cantidad}</span>
+                    <span>${(parseFloat(detalle.precio_unitario) * detalle.cantidad).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="mt-3 font-bold text-lg text-blue-700 flex justify-between">
+                  <span>Total:</span>
+                  <span>${parseFloat(selectedReserva.total).toFixed(2)} {selectedReserva.moneda}</span>
+                </div>
+              </div>
+
+              {/* Formulario de pago */}
+              <div className="bg-white border p-4 rounded-lg shadow-sm mb-6">
+                <h4 className="text-lg font-semibold mb-3">Método de Pago</h4>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Número de tarjeta
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="1234 5678 9012 3456"
+                      maxLength={19}
+                      value={numeroTarjeta}
+                      onChange={(e) =>
+                        setNumeroTarjeta(
+                          e.target.value
+                            .replace(/\D/g, "")
+                            .replace(/(.{4})/g, "$1 ")
+                            .trim()
+                        )
+                      }
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Fecha de vencimiento
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="MM/AA"
+                        maxLength={5}
+                        value={fechaVencimiento}
+                        onChange={(e) =>
+                          setFechaVencimiento(
+                            e.target.value
+                              .replace(/\D/g, "")
+                              .replace(/(\d{2})(\d{1,2})/, "$1/$2")
+                              .substring(0, 5)
+                          )
+                        }
+                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Estado:</span>
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getEstadoColor(selectedReserva.estado)}`}>
-                        {selectedReserva.estado.charAt(0).toUpperCase() + selectedReserva.estado.slice(1)}
-                      </div>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Fecha de Reserva:</span>
-                      <span className="font-medium">{formatFecha(selectedReserva.created_at)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Fecha de Viaje:</span>
-                      <span className="font-medium">{formatFecha(selectedReserva.fecha_inicio)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Usuario:</span>
-                      <span className="font-medium">{selectedReserva.usuario?.username || 'N/A'}</span>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        CVV
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="123"
+                        maxLength={4}
+                        value={cvv}
+                        onChange={(e) => setCvv(e.target.value.replace(/\D/g, ""))}
+                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                      />
                     </div>
                   </div>
-                </div>
 
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Costos</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between text-2xl font-bold text-blue-600">
-                      <span>Total:</span>
-                      <span>${parseFloat(selectedReserva.total).toFixed(2)} USD</span>
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Total por {selectedReserva.detalles.reduce((sum, detalle) => sum + detalle.cantidad, 0)} persona(s)
-                    </div>
-                    <div className="text-sm text-gray-600">
-                      Duración estimada: {calcularDuracion(selectedReserva.detalles)}
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="guardarTarjeta"
+                      checked={guardarTarjeta}
+                      onChange={(e) => setGuardarTarjeta(e.target.checked)}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <label htmlFor="guardarTarjeta" className="text-sm text-gray-700">
+                      Guardar tarjeta para futuras compras
+                    </label>
                   </div>
                 </div>
               </div>
 
-              {/* Detalles de actividades */}
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <MapPin className="w-5 h-5" />
-                  Actividades y Destinos
-                </h3>
-                <div className="grid gap-4">
-                  {selectedReserva.detalles.map((detalle, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                      <div className="flex flex-col md:flex-row justify-between items-start gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <img
-                              src={obtenerImagenDestino(detalle.titulo)}
-                              alt={detalle.titulo}
-                              className="w-16 h-16 object-cover rounded-lg"
-                            />
-                            <div>
-                              <h4 className="font-semibold text-gray-900">{detalle.titulo}</h4>
-                              <p className="text-sm text-gray-600 capitalize">{detalle.tipo}</p>
-                              <p className="text-sm text-gray-600">{detalle.cantidad} persona(s)</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-lg font-semibold text-gray-900">
-                            ${parseFloat(detalle.precio_unitario).toFixed(2)}
-                          </div>
-                          <div className="text-sm text-gray-600">por persona</div>
-                          <div className="text-sm font-medium text-blue-600">
-                            Subtotal: ${(parseFloat(detalle.precio_unitario) * detalle.cantidad).toFixed(2)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Botones */}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={cerrarModal}>Cerrar</Button>
 
-              {/* Notas adicionales */}
-              {selectedReserva.notas && (
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Notas Adicionales</h3>
-                  <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                    <p className="text-gray-700">{selectedReserva.notas}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Botones de acción en el modal */}
-              <div className="flex gap-3 pt-6 border-t">
                 <Button
-                  variant="outline"
-                  onClick={cerrarModal}
-                  className="flex-1 md:flex-none"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={handlePayNow}
+                  disabled={processingPayment}
                 >
-                  Cerrar
+                  {processingPayment ? "Procesando pago..." : "Pagar ahora"}
                 </Button>
-                {(selectedReserva.estado.toLowerCase() === "confirmada" || selectedReserva.estado.toLowerCase() === "confirmado") && (
-                  <Button
-                    variant="outline"
-                    className="flex-1 md:flex-none"
-                    onClick={() => {
-                      console.log('Modificar reserva:', selectedReserva.id);
-                      // Aquí puedes agregar la lógica para modificar la reserva
-                    }}
-                  >
-                    Modificar Reserva
-                  </Button>
-                )}
-                {(selectedReserva.estado.toLowerCase() === "confirmada" || 
-                  selectedReserva.estado.toLowerCase() === "confirmado" || 
-                  selectedReserva.estado.toLowerCase() === "pendiente") && (
-                  <Button
-                    variant="destructive"
-                    className="flex-1 md:flex-none"
-                    onClick={() => cancelarReserva(selectedReserva)}
-                    disabled={loading}
-                  >
-                    {loading ? "Cancelando..." : "Cancelar Reserva"}
-                  </Button>
-                )}
+
               </div>
+
             </div>
           </div>
         </div>
