@@ -70,12 +70,28 @@ interface Reserva {
   estado: 'PENDIENTE' | 'PAGADA' | 'CANCELADA' | 'REPROGRAMADA';
   cupon: number | null;
   total: string;
+
+  detalles: Array<{
+    titulo: string;
+    tipo: string;
+    precio_unitario: string;
+    cantidad: number;
+  }>;
+  usuario?: {
+    id: number;
+    username: string;
+  };
+  notas?: string;
+  moneda?: string;
+  acompanantes?: any[];
+
   moneda: string;
   fecha_original?: string;
   fecha_reprogramacion?: string;
   motivo_reprogramacion?: string;
   numero_reprogramaciones: number;
   reprogramado_por?: number;
+
   created_at: string;
   updated_at: string;
   servicios: ReservaServicio[];
@@ -94,6 +110,7 @@ interface Notificacion {
 export default function ClientReservations() {
   const [reservations, setReservations] = useState<Reserva[]>([]);
   const [loading, setLoading] = useState(true);
+  const [processingPayment, setProcessingPayment] = useState(false); // nuevo
   const [filtro, setFiltro] = useState("todas");
   const [busqueda, setBusqueda] = useState("");
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
@@ -119,7 +136,14 @@ export default function ClientReservations() {
   
   const { toast } = useToast();
   const { user } = useAuth();
+
+  const [numeroTarjeta, setNumeroTarjeta] = useState("");
+  const [fechaVencimiento, setFechaVencimiento] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [guardarTarjeta, setGuardarTarjeta] = useState(false);
+
   const router = useRouter();
+ 
 
   // Cargar reservas del usuario
   const cargarReservas = async () => {
@@ -157,6 +181,10 @@ export default function ClientReservations() {
       
       // La respuesta de axios viene en response.data
       if (response.data && Array.isArray(response.data)) {
+
+        // Filtrar solo las reservas del usuario actual
+        const userId = typeof user.id === 'string' ? parseInt(user.id) : user.id;
+
         // Mostrar estructura de reservas para debug
         if (response.data.length > 0) {
           console.log('📋 Primera reserva ejemplo:', response.data[0]);
@@ -175,6 +203,7 @@ export default function ClientReservations() {
         }
         
         // Filtrar reservas considerando que usuario puede ser un objeto
+
         const reservasUsuario = response.data.filter(
           (reserva: Reserva) => {
             // Extraer ID del usuario dependiendo de la estructura
@@ -373,6 +402,65 @@ export default function ClientReservations() {
     return "/placeholder.jpg";
   };
 
+
+  const calcularDuracion = (detalles: any[]) => {
+    if (detalles.length === 0) return "1 día";
+    if (detalles.length > 3) return `${detalles.length} días`;
+    if (detalles.length > 1) return `${detalles.length} días`;
+    return "1 día";
+  };
+
+  // Helpers de tarjeta
+  const onlyDigits = (s: string) => s.replace(/\D/g, "");
+  const validarTarjeta = (): { ok: boolean; mensaje?: string } => {
+    const num = onlyDigits(numeroTarjeta);
+    if (num.length !== 16) return { ok: false, mensaje: "El número de tarjeta debe tener 16 dígitos" };
+
+    // Fecha MM/AA
+    const mmYY = fechaVencimiento.replace(/\s/g, "");
+    if (!/^\d{2}\/\d{2}$/.test(mmYY)) return { ok: false, mensaje: "Formato de fecha debe ser MM/AA" };
+
+    const [mmStr, yyStr] = mmYY.split("/");
+    const mm = parseInt(mmStr, 10);
+    const yy = parseInt(yyStr, 10);
+    if (mm < 1 || mm > 12) return { ok: false, mensaje: "Mes inválido" };
+
+    // año actual (2 dígitos)
+    const now = new Date();
+    const currentYY = parseInt(now.getFullYear().toString().slice(-2), 10);
+    const currentMM = now.getMonth() + 1;
+    if (yy < currentYY || (yy === currentYY && mm < currentMM)) return { ok: false, mensaje: "Tarjeta vencida" };
+
+    // CVV
+    if (!/^\d{3,4}$/.test(cvv)) return { ok: false, mensaje: "CVV inválido" };
+
+    return { ok: true };
+  };
+
+  const maskCard = (num: string) => {
+    const digits = onlyDigits(num);
+    const last4 = digits.slice(-4);
+    return `**** **** **** ${last4}`;
+  };
+
+  const saveCardLocal = (cardToken: string, cardNumber: string) => {
+    try {
+      const existing = JSON.parse(localStorage.getItem("saved_cards") || "[]");
+      const toSave = {
+        token: cardToken,
+        masked: maskCard(cardNumber),
+        saved_at: new Date().toISOString(),
+        userId: user?.id ?? null,
+      };
+      existing.push(toSave);
+      localStorage.setItem("saved_cards", JSON.stringify(existing));
+    } catch (e) {
+      console.warn("No se pudo guardar tarjeta localmente:", e);
+    }
+  };
+
+
+
   // Calcular estadísticas del cliente usando useMemo para optimización
   const estadisticasCliente = useMemo(() => {
     const totalReservas = reservations.length;
@@ -444,6 +532,11 @@ export default function ClientReservations() {
   const verDetallesReserva = (reserva: Reserva) => {
     setSelectedReserva(reserva);
     setShowModal(true);
+    // reset campos de pago (opc)
+    setNumeroTarjeta("");
+    setFechaVencimiento("");
+    setCvv("");
+    setGuardarTarjeta(false);
   };
 
   // Función para cerrar el modal
@@ -538,6 +631,77 @@ export default function ClientReservations() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Función principal del pago (simulada)
+  const handlePayNow = async () => {
+    if (!selectedReserva) return;
+
+    // Validación
+    const v = validarTarjeta();
+    if (!v.ok) {
+      toast({
+        title: "Datos inválidos",
+        description: v.mensaje || "Revisa los datos de la tarjeta",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setProcessingPayment(true);
+
+      // Simular tokenización en gateway
+      await new Promise((r) => setTimeout(r, 800));
+      const fakeToken = "tok_" + Math.random().toString(36).substring(2, 12);
+
+      // Si el usuario quiere guardar la tarjeta, lo guardamos localmente (simulado)
+      if (guardarTarjeta) {
+        saveCardLocal(fakeToken, numeroTarjeta);
+      }
+
+      // Simular cobro en pasarela
+      await new Promise((r) => setTimeout(r, 900));
+
+      // Actualizar estado de la reserva en backend (ej: confirmada)
+      // Solo enviamos el campo que el backend espera (según tu API)
+      const response = await editarReserva(selectedReserva.id.toString(), {
+        estado: "confirmada", // cambia según tu flujo si quieres 'pagada' u otro
+      });
+
+      if (response.status === 200) {
+        toast({
+          title: "Pago exitoso",
+          description: `Tu reserva #${selectedReserva.id} fue pagada con tarjeta terminada en ${numeroTarjeta.slice(-4)}.`,
+        });
+
+        // limpiar campos
+        setNumeroTarjeta("");
+        setFechaVencimiento("");
+        setCvv("");
+        setGuardarTarjeta(false);
+
+        // Recargar reservas y cerrar modal
+        await cargarReservas();
+        cerrarModal();
+      } else {
+        console.error("Respuesta inesperada al actualizar reserva:", response);
+        toast({
+          title: "Error",
+          description: "No se pudo actualizar la reserva después del pago",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("❌ Error en flujo de pago:", error);
+      toast({
+        title: "Error de pago",
+        description: error?.response?.data?.detail || "Ocurrió un error al procesar el pago",
+        variant: "destructive",
+      });
+    } finally {
+      setProcessingPayment(false);
     }
   };
 
@@ -1294,7 +1458,7 @@ export default function ClientReservations() {
                         className="bg-blue-600 hover:bg-blue-700"
                         onClick={() => verDetallesReserva(reserva)}
                       >
-                        Ver Detalles
+                        Checkout
                       </Button>
                       
                       {/* Botón de favorito */}
@@ -1418,7 +1582,7 @@ export default function ClientReservations() {
           <div className="bg-white rounded-xl shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             {/* Header del modal */}
             <div className="flex justify-between items-center p-6 border-b">
-              <h2 className="text-2xl font-bold text-gray-900">Detalles de la Reserva</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Checkout de la Reserva</h2>
               <Button
                 variant="ghost"
                 size="sm"
@@ -1432,7 +1596,7 @@ export default function ClientReservations() {
             {/* Contenido del modal */}
             <div className="p-6">
               {/* Información básica */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Información General</h3>
                   <div className="space-y-3">
@@ -1460,9 +1624,22 @@ export default function ClientReservations() {
                         {selectedReserva.acompanantes?.find(ra => ra.es_titular)?.acompanante?.nombre || 
                          `Usuario ID: ${selectedReserva.usuario}`}
                       </span>
+
                     </div>
                   </div>
-                </div>
+
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="guardarTarjeta"
+                      checked={guardarTarjeta}
+                      onChange={(e) => setGuardarTarjeta(e.target.checked)}
+                      className="h-4 w-4 text-blue-600"
+                    />
+                    <label htmlFor="guardarTarjeta" className="text-sm text-gray-700">
+                      Guardar tarjeta para futuras compras
+                    </label>
 
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Resumen de Costos</h3>
@@ -1479,6 +1656,7 @@ export default function ClientReservations() {
                     <div className="text-sm text-gray-600">
                       Servicios contratados: {(selectedReserva.servicios || []).length} servicio(s)
                     </div>
+
                   </div>
                 </div>
 
@@ -1513,6 +1691,12 @@ export default function ClientReservations() {
                   </div>
                 </div>
               </div>
+
+
+              {/* Botones */}
+              <div className="flex justify-end gap-3">
+                <Button variant="outline" onClick={cerrarModal}>Cerrar</Button>
+
 
               {/* Detalles de actividades */}
               <div className="mb-6">
@@ -1696,13 +1880,17 @@ export default function ClientReservations() {
 
               {/* Botones de acción en el modal */}
               <div className="flex gap-3 pt-6 border-t">
+
                 <Button
-                  variant="outline"
-                  onClick={cerrarModal}
-                  className="flex-1 md:flex-none"
+                  className="bg-blue-600 text-white hover:bg-blue-700"
+                  onClick={handlePayNow}
+                  disabled={processingPayment}
                 >
-                  Cerrar
+                  {processingPayment ? "Procesando pago..." : "Pagar ahora"}
                 </Button>
+
+
+
                 {(selectedReserva.estado.toUpperCase() === "PAGADA") && (
                   <Button
                     variant="outline"
@@ -1726,7 +1914,9 @@ export default function ClientReservations() {
                     {loading ? "Cancelando..." : "Cancelar Reserva"}
                   </Button>
                 )}
+
               </div>
+
             </div>
           </div>
         </div>
