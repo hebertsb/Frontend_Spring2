@@ -13,6 +13,7 @@ import { Calendar, CheckCircle, Phone, Mail, User, Users, Plane, X, Plus } from 
 import { useToast } from "@/hooks/use-toast"
 import useAuth from "@/hooks/useAuth"
 import { crearReserva } from "@/api/reservas"
+import { detectarTipoServicio, prepararReservaServicio, prepararReservaPaquete } from "@/api/paquetes"
 
 // Tipos basados en la documentación del backend
 interface Acompanante {
@@ -93,6 +94,21 @@ export default function FlujoReservaModerno({ servicioSeleccionado, onReservaCom
 
   const [procesandoReserva, setProcesandoReserva] = useState(false);
   const [pasoActual, setPasoActual] = useState<'titular' | 'acompanantes' | 'detalles' | 'confirmacion'>('titular');
+
+  // Debug: Monitorear cambios en el servicio seleccionado
+  useEffect(() => {
+    console.log('🔍 SERVICIO SELECCIONADO PROP:', {
+      id: servicioSeleccionado?.id,
+      nombre: servicioSeleccionado?.nombre,
+      precio: servicioSeleccionado?.precio,
+      tipo_precio: typeof servicioSeleccionado?.precio
+    });
+    
+    console.log('🔍 PRECIO EN FORMULARIO:', {
+      precio: formulario.servicio?.precio,
+      tipo_precio: typeof formulario.servicio?.precio
+    });
+  }, [servicioSeleccionado, formulario.servicio?.precio]);
 
   // Autocompletar datos del titular desde la sesión
   useEffect(() => {
@@ -375,20 +391,27 @@ export default function FlujoReservaModerno({ servicioSeleccionado, onReservaCom
 
   // Volver al paso anterior
   const pasoAnterior = () => {
+    console.log('🔙 Intentando volver atrás desde:', pasoActual);
+    
     switch (pasoActual) {
       case 'acompanantes':
+        console.log('🔙 Volviendo a titular');
         setPasoActual('titular');
         break;
       case 'detalles':
+        console.log('🔙 Volviendo a acompañantes');
         setPasoActual('acompanantes');
         break;
       case 'confirmacion':
+        console.log('🔙 Volviendo a detalles');
         setPasoActual('detalles');
         break;
+      default:
+        console.log('🔙 No se puede volver atrás desde:', pasoActual);
     }
   };
 
-  // Calcular total
+  // Calcular total (usar precio del servicio seleccionado del frontend)
   const calcularTotal = () => {
     const cantidadPersonas = 1 + formulario.acompanantes.length; // Titular + acompañantes
     return formulario.servicio.precio * cantidadPersonas;
@@ -430,58 +453,91 @@ export default function FlujoReservaModerno({ servicioSeleccionado, onReservaCom
     });
 
     try {
-      // Crear fecha en formato ISO
+      // 🎯 NUEVO ENFOQUE: Detectar tipo y usar precios correctos del backend
+      console.log('🔍 DETECTANDO TIPO DE SERVICIO/PAQUETE...');
+      console.log('ID a verificar:', formulario.servicio.id);
+      
+      const tipoDetectado = await detectarTipoServicio(formulario.servicio.id);
+      
+      if (!tipoDetectado) {
+        throw new Error('No se pudo determinar el tipo de servicio/paquete');
+      }
+      
+      console.log('✅ Tipo detectado:', tipoDetectado.tipo);
+      console.log('📊 Datos del backend:', tipoDetectado.data);
+      
+      const cantidadPersonas = 1 + formulario.acompanantes.length;
+      console.log('👥 CÁLCULO DE PERSONAS:', {
+        titular: 1,
+        acompanantes: formulario.acompanantes.length,
+        total_personas: cantidadPersonas
+      });
+      
+      let payloadReserva;
+      
+      if (tipoDetectado.tipo === 'paquete') {
+        console.log('📦 Preparando reserva para PAQUETE...');
+        // CORRECCIÓN: Usar el precio del formulario (interfaz), no del backend
+        const paqueteConPrecioCorrector = {
+          ...tipoDetectado.data,
+          precio: formulario.servicio.precio // USAR PRECIO DE LA INTERFAZ
+        };
+        console.log('🔧 Precio corregido del paquete:', {
+          precio_backend: tipoDetectado.data.precio,
+          precio_interfaz: formulario.servicio.precio,
+          precio_a_usar: paqueteConPrecioCorrector.precio
+        });
+        payloadReserva = await prepararReservaPaquete(paqueteConPrecioCorrector, cantidadPersonas);
+      } else {
+        console.log('🔧 Preparando reserva para SERVICIO INDIVIDUAL...');
+        payloadReserva = prepararReservaServicio(tipoDetectado.data, cantidadPersonas);
+      }
+      
+      // Agregar fecha de inicio
       const fechaServicio = new Date(formulario.detalles.fecha_inicio + "T10:00:00Z");
-      const cantidadTotal = 1 + formulario.acompanantes.length;
-      const total = calcularTotal();
-
-      // Estructura del payload según documentación del backend
-      const payload = {
-        "fecha_inicio": fechaServicio.toISOString(),
-        "estado": "PENDIENTE",
-        "total": total.toFixed(2), // STRING con decimales
-        "moneda": "BOB",
-        "detalles": [
-          {
-            "servicio": formulario.servicio.id,
-            "cantidad": cantidadTotal,
-            "precio_unitario": formulario.servicio.precio.toFixed(2), // STRING con decimales
-            "fecha_servicio": fechaServicio.toISOString()
-          }
-        ],
-        "acompanantes": [
-          // Titular como primer acompañante
-          {
-            "acompanante": {
-              "documento": formulario.titular.documento,
-              "nombre": formulario.titular.nombre,
-              "apellido": formulario.titular.apellido,
-              "fecha_nacimiento": formulario.titular.fecha_nacimiento,
-              "nacionalidad": formulario.titular.nacionalidad,
-              "email": formulario.titular.email
-            },
-            "estado": "CONFIRMADO",
-            "es_titular": true
+      payloadReserva.fecha_inicio = fechaServicio.toISOString();
+      payloadReserva.estado = "PENDIENTE";
+      
+      // Actualizar fecha en detalles
+      payloadReserva.detalles = payloadReserva.detalles.map((detalle: any) => ({
+        ...detalle,
+        fecha_servicio: fechaServicio.toISOString()
+      }));
+      
+      // Agregar acompañantes
+      payloadReserva.acompanantes = [
+        // Titular como primer acompañante
+        {
+          "acompanante": {
+            "documento": formulario.titular.documento,
+            "nombre": formulario.titular.nombre,
+            "apellido": formulario.titular.apellido,
+            "fecha_nacimiento": formulario.titular.fecha_nacimiento,
+            "nacionalidad": formulario.titular.nacionalidad,
+            "email": formulario.titular.email,
+            "telefono": formulario.titular.telefono
           },
-          // Acompañantes adicionales
-          ...formulario.acompanantes.map(acomp => ({
-            "acompanante": {
-              "documento": acomp.documento,
-              "nombre": acomp.nombre,
-              "apellido": acomp.apellido,
-              "fecha_nacimiento": acomp.fecha_nacimiento,
-              "nacionalidad": acomp.nacionalidad,
-              "email": acomp.email || formulario.titular.email // Usar email del titular si no se proporciona
-            },
-            "estado": "CONFIRMADO",
-            "es_titular": false
-          }))
-        ]
-      };
+          "estado": "CONFIRMADO",
+          "es_titular": true
+        },
+        // Acompañantes adicionales
+        ...formulario.acompanantes.map(acomp => ({
+          "acompanante": {
+            "documento": acomp.documento,
+            "nombre": acomp.nombre,
+            "apellido": acomp.apellido,
+            "fecha_nacimiento": acomp.fecha_nacimiento,
+            "nacionalidad": acomp.nacionalidad,
+            "email": acomp.email || formulario.titular.email,
+            "telefono": acomp.telefono || formulario.titular.telefono
+          },
+          "estado": "CONFIRMADO",
+          "es_titular": false
+        }))
+      ];
 
       // Agregar cupón si se proporcionó
       if (formulario.detalles.codigo_cupon.trim()) {
-        // Aquí podrías agregar lógica para validar el cupón
         console.log('Código de cupón proporcionado:', formulario.detalles.codigo_cupon);
       }
 
@@ -490,9 +546,9 @@ export default function FlujoReservaModerno({ servicioSeleccionado, onReservaCom
         console.log('Notas adicionales:', formulario.detalles.notas_adicionales);
       }
 
-      console.log('📋 PAYLOAD FINAL DE RESERVA:', JSON.stringify(payload, null, 2));
-
-      const response = await crearReserva(payload);
+      console.log('📋 PAYLOAD FINAL CON PRECIOS CORRECTOS:', JSON.stringify(payloadReserva, null, 2));
+      
+      const response = await crearReserva(payloadReserva);
 
       if (response.status === 201 && response.data) {
         const numeroReserva = response.data.id || `BOL-${Date.now()}`;

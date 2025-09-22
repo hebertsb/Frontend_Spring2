@@ -40,7 +40,7 @@ export const detectarTipoServicio = async (id: string | number) => {
       const paqueteResponse = await obtenerPaquete(id);
       if (paqueteResponse.data) {
         return {
-          tipo: 'paquete' as const,
+          tipo: 'paquete',
           data: paqueteResponse.data
         };
       }
@@ -53,17 +53,13 @@ export const detectarTipoServicio = async (id: string | number) => {
     const servicioResponse = await obtenerServicio(id);
     if (servicioResponse.data) {
       return {
-        tipo: 'servicio' as const,
+        tipo: 'servicio',
         data: servicioResponse.data
       };
     }
-
-    // Si no es ni paquete ni servicio, devolver null
-    console.error('❌ ID no corresponde a paquete ni servicio:', id);
-    return null;
   } catch (error) {
     console.error('❌ Error al detectar tipo de servicio:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -85,10 +81,7 @@ export const prepararReservaServicio = (servicio: any, cantidadPersonas: number 
       cantidad: cantidadPersonas,
       precio_unitario: servicio.costo.toString(),
       fecha_servicio: new Date().toISOString()
-    }],
-    fecha_inicio: '',
-    estado: '',
-    acompanantes: [] as any[]
+    }]
   };
 };
 
@@ -105,14 +98,6 @@ export const prepararReservaPaquete = async (paquete: any, cantidadPersonas: num
   // CRUCIAL: Usar el precio total del paquete (precio por persona * cantidad)
   const precioPorPersona = parseFloat(paquete.precio);
   const totalPaquete = precioPorPersona * cantidadPersonas;
-  
-  console.log('💰 CÁLCULO DETALLADO DEL PAQUETE:', {
-    precio_por_persona: precioPorPersona,
-    cantidad_personas: cantidadPersonas,
-    multiplicacion: `${precioPorPersona} × ${cantidadPersonas}`,
-    total_calculado: totalPaquete,
-    total_formateado: totalPaquete.toFixed(2)
-  });
 
   // ESTRATEGIA DEFINITIVA: Obtener servicios y usar el primero como "contenedor"
   const serviciosResponse = await listarServicios();
@@ -155,9 +140,6 @@ export const prepararReservaPaquete = async (paquete: any, cantidadPersonas: num
   return {
     total: totalPaquete.toFixed(2),
     moneda: "BOB",
-    detalles,
-    fecha_inicio: '',
-    estado: '',
-    acompanantes: [] as any[]
+    detalles
   };
 };

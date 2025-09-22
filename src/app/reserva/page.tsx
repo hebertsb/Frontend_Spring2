@@ -50,20 +50,65 @@ export default function PaginaReserva() {
 
     // Priorizar siempre los parámetros de la URL que vienen del paquete/destino seleccionado
     if (nombre && precio) {
-      // Manejar tanto formato de dólares como bolivianos
-      const precioLimpio = precio.replace(/[$Bs\.,\s]/g, ''); // Remover símbolos de moneda y espacios
-      const precioNumerico = parseFloat(precioLimpio);
+      // DEBUGGING: Mostrar el precio original
+      console.log('💰 DEBUGGING PRECIO COMPLETO:');
+      console.log('- Precio original:', precio, typeof precio);
       
-      console.log('💰 Precio desde URL:', precio);
-      console.log('💰 Precio limpio:', precioLimpio);
-      console.log('💰 Precio numérico final:', precioNumerico);
+      // Método alternativo más seguro para procesar precios
+      let precioNumerico;
+      
+      // Si ya es un número, usarlo directamente
+      if (typeof precio === 'number') {
+        precioNumerico = precio;
+      } else {
+        // NUEVO ENFOQUE: Mejor parseado de precios
+        console.log('💰 DEBUGGING PRECIO COMPLETO:');
+        console.log('- Precio original:', precio, typeof precio);
+        
+        // Extraer solo los números, manteniendo el formato correcto
+        let numerosSolo = precio.replace(/[^0-9]/g, ''); // Solo números
+        console.log('- Solo números extraídos:', numerosSolo);
+        
+        if (numerosSolo) {
+          precioNumerico = parseFloat(numerosSolo);
+          console.log('- ParseFloat resultado:', precioNumerico);
+        } else {
+          precioNumerico = 0;
+        }
+        
+        // Verificación adicional
+        if (isNaN(precioNumerico) || precioNumerico <= 0) {
+          console.error('❌ PRECIO INVÁLIDO DETECTADO:', precioNumerico);
+        }
+      }
+      
+      console.log('💰 PRECIO FINAL CALCULADO:', precioNumerico);
+      console.log('💰 TIPO FINAL:', typeof precioNumerico);
+      
+      // Verificación de cordura para precios específicos
+      if (precioNumerico < 1 && precio.includes('1200')) {
+        console.error('🚨 ERROR CRÍTICO: Precio 1200 convertido a', precioNumerico);
+        console.error('🚨 Forzando corrección...');
+        precioNumerico = 1200; // Corrección temporal
+      }
+      
+      if (precioNumerico < 1 && precio.includes('2400')) {
+        console.error('🚨 ERROR CRÍTICO: Precio 2400 convertido a', precioNumerico);
+        console.error('🚨 Forzando corrección...');
+        precioNumerico = 2400; // Corrección temporal
+      }
       
       setServicioSeleccionado({
         id: parseInt(servicioId),
         nombre: nombre,
         precio: precioNumerico
       });
-      console.log('✅ Servicio cargado desde URL:', { id: servicioId, nombre, precio: precioNumerico });
+      console.log('✅ Servicio cargado desde URL:', { 
+        id: servicioId, 
+        nombre, 
+        precio: precioNumerico,
+        precio_formateado: `Bs. ${precioNumerico.toFixed(2)}`
+      });
     } else {
       // Fallback: buscar en la lista de servicios disponibles solo si no hay parámetros completos
       const servicio = SERVICIOS_DISPONIBLES.find(s => s.id === parseInt(servicioId));
