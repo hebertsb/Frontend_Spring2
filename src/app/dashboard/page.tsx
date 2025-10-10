@@ -13,7 +13,7 @@ export default function DashboardPage() {
       // Mostrar el rol real en consola para depuración
       console.log('ROL DEL USUARIO:', user.role);
       // Permitir acceso si el rol es admin (string)
-      const isAdmin = user.role && user.role.toLowerCase() === "admin";
+      const isAdmin = user.role && user.role.toLowerCase() === "administrador";
       if (!isAdmin) {
         router.replace("/");
       }

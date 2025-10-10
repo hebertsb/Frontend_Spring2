@@ -31,7 +31,7 @@ export function GaleriaImagenes({ imagenes, titulo }: PropsGaleriaImagenes) {
           {/* Imagen Principal */}
           <div className="relative col-span-4 overflow-hidden rounded-lg cursor-pointer md:col-span-3 group">
             <Image
-              src={imagenes[imagenActual] || "/placeholder.svg?height=400&width=600&query=paisaje boliviano"}
+              src={imagenes[imagenActual] || "/placeholder.svg"}
               alt={`${titulo} - Imagen ${imagenActual + 1}`}
               className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
               width={600}
@@ -71,7 +71,7 @@ export function GaleriaImagenes({ imagenes, titulo }: PropsGaleriaImagenes) {
                 onClick={() => setImagenActual(index)}
               >
                 <Image
-                  src={imagen || `/placeholder.svg?height=100&width=150&query=miniatura paisaje boliviano ${index + 1}`}
+                  src={imagen || "/placeholder.svg"}
                   alt={`${titulo} - Miniatura ${index + 1}`}
                   className="object-cover w-full h-full"
                   width={150}
@@ -101,7 +101,7 @@ export function GaleriaImagenes({ imagenes, titulo }: PropsGaleriaImagenes) {
           </Button>
           <div className="relative max-w-4xl max-h-full">
             <Image
-              src={imagenes[imagenActual] || "/placeholder.svg?height=600&width=800&query=paisaje boliviano ampliado"}
+              src={imagenes[imagenActual] || "/placeholder.svg"}
               alt={`${titulo} - Imagen ${imagenActual + 1}`}
               className="object-contain max-w-full max-h-full"
               width={800}

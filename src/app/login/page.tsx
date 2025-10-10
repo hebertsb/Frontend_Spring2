@@ -124,7 +124,7 @@ export default function LoginPage() {
 					<Image
 						src="/login.png"
 						alt="Bolivia"
-						layout="fill"
+						fill
 						className="absolute inset-0 object-cover w-full h-full"
 					/>
 					<div className="overlay-contrast" />

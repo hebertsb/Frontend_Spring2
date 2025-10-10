@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+
 import { Paquete } from "./datos";  // Importar el tipo Paquete
 import { Navegacion } from "@/components/comunes/navegacion";
 import { Breadcrumbs } from "@/components/comunes/breadcrumbs";
@@ -12,6 +13,7 @@ import { Star, MapPin, Clock, Users, Heart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
+
 export default function PaginaPaquetes() {
   const [paquetes, setPaquetes] = useState<Paquete[]>([]); // Tipar el estado con Paquete
   const [paquetesFiltrados, setPaquetesFiltrados] = useState<Paquete[]>([]);
@@ -20,14 +22,14 @@ export default function PaginaPaquetes() {
   const [dificultadFiltro, setDificultadFiltro] = useState("");
   const [ordenarPor, setOrdenarPor] = useState("relevancia");
 
+
   useEffect(() => {
     const fetchPaquetes = async () => {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/paquetes/`);
-      const data: Paquete[] = await response.json(); // Tipar la respuesta con Paquete[]
+      const data: Paquete[] = await response.json();
       setPaquetes(data);
       setPaquetesFiltrados(data);
     };
-
     fetchPaquetes();
   }, []);
 

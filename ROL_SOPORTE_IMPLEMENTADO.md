@@ -1,84 +1,89 @@
-# 🎯 IMPLEMENTACIÓN COMPLETA DEL ROL SOPORTE
-
-## ✅ **Cambios realizados para el nuevo rol SOPORTE (ID: 5)**
-
-### **1. Dashboard Administrativo (`admin-dashboard.tsx`)**
-- ✅ **ROLE_MAP actualizado** con el rol SOPORTE (ID: 5)
-- ✅ **Estadísticas incluidas** - Se cuentan usuarios con rol soporte
-- ✅ **Filtros actualizados** - Incluye SOPORTE en el array de roles
-- ✅ **Asignación de roles** - Permite asignar rol SOPORTE a usuarios
-- ✅ **Título dinámico** - Cambia según el rol (Admin/Soporte)
-- ✅ **Descripción dinámica** - Adapta la descripción según el rol
-
-### **2. Navegación (`navegacion.tsx`)**
-- ✅ **Desktop navigation** - Muestra "Panel Soporte" para rol 5
-- ✅ **Mobile navigation** - Incluye navegación móvil para soporte
-- ✅ **Detección de rol** - Verifica tanto roles[] como role string
-
-### **3. Rutas Protegidas (`panel/page.tsx`)**
-- ✅ **Acceso autorizado** - Roles permitidos: [1, 5] (Admin y Soporte)
-- ✅ **Redirección segura** - Usuarios sin permisos van a "/"
-
-### **4. Componente NavUser (`nav-user.tsx`)**
-- ✅ **Dropdown actualizado** - Muestra "Panel Soporte" para rol 5
-- ✅ **Lógica de acceso** - Diferencia entre Admin, Soporte y Cliente
-- ✅ **URLs correctas** - Redirige al panel con parámetros apropiados
-
-### **5. ProtectedRoute (`ProtectedRoute.tsx`)**
-- ✅ **Mapeo de roles** - Incluye SOPORTE en el roleMap
-- ✅ **Verificación dual** - Chequea tanto IDs como nombres de rol
+# Guía para solucionar error CORS y IDs duplicados en login (rol SOPORTE)
 
 ---
 
-## 🎨 **Visualización en el Dashboard:**
+## 1. Error de CORS al hacer login
 
-### **Estadísticas mostradas:**
-1. **Primera fila:** Total Usuarios, Usuarios Activos, Operadores, Clientes
-2. **Segunda fila:** Administradores, Soporte, Usuarios Inactivos
+### 🛠️ Pasos para habilitar CORS en el backend
 
-### **Funcionalidades para rol SOPORTE:**
-- ✅ Ver estadísticas de todos los usuarios
-- ✅ Gestionar usuarios (editar, deshabilitar, reactivar)
-- ✅ Asignar roles a otros usuarios
-- ✅ Filtrar y buscar usuarios
-- ✅ Ver gráficos de actividad
-- ✅ Acceso completo al dashboard administrativo
+### 1.1 Identificar el framework
+- ¿El backend es Django, FastAPI, Flask, Node.js, etc.?
 
-### **Diferencias visuales:**
-- **Admin:** "Panel Administrativo - Turismo Bolivia"
-- **Soporte:** "Panel de Soporte - Turismo Bolivia"
+### 1.2 Agregar el dominio de Netlify a la configuración de CORS
+
+#### **Si usas Django + django-cors-headers:**
+1. Instala el paquete si no lo tienes:
+   ```bash
+   pip install django-cors-headers
+   ```
+2. Agrega `'corsheaders'` a `INSTALLED_APPS` en `settings.py`.
+3. Agrega el middleware al inicio de `MIDDLEWARE`:
+   ```python
+   'corsheaders.middleware.CorsMiddleware',
+   ```
+4. Agrega tu dominio Netlify a la lista de orígenes permitidos:
+   ```python
+   CORS_ALLOWED_ORIGINS = [
+       "https://hilarious-lokum-3acdf9.netlify.app",
+   ]
+   ```
+5. Reinicia el servidor backend.
+
+#### **Si usas FastAPI:**
+1. Instala el paquete CORS:
+   ```bash
+   pip install fastapi[all]
+   ```
+2. Agrega el middleware en tu archivo principal:
+   ```python
+   from fastapi.middleware.cors import CORSMiddleware
+
+   app.add_middleware(
+       CORSMiddleware,
+       allow_origins=["https://hilarious-lokum-3acdf9.netlify.app"],
+       allow_credentials=True,
+       allow_methods=["*"],
+       allow_headers=["*"],
+   )
+   ```
+3. Reinicia el servidor backend.
+
+#### **Si usas Node.js (Express):**
+1. Instala el paquete:
+   ```bash
+   npm install cors
+   ```
+2. Configura CORS en tu app:
+   ```js
+   const cors = require('cors');
+   app.use(cors({
+     origin: 'https://hilarious-lokum-3acdf9.netlify.app'
+   }));
+   ```
+3. Reinicia el servidor backend.
+
+### 1.3 Verifica
+- Haz login desde tu frontend en Netlify.
+- Si todo está bien, el error de CORS desaparecerá.
+
+**Nota:** Si tienes varios entornos (producción, desarrollo), agrega todos los dominios necesarios.
 
 ---
 
-## 🔗 **Navegación actualizada:**
+## 2. Error de IDs duplicados en el login
 
-### **Usuario con rol ADMIN (ID: 1):**
-- Navegación: "Panel Admin"
-- Dropdown: "Panel Admin"
+### Problema
+- Hay dos inputs con el mismo `id="login-email"` y dos con `id="login-password"` en el formulario de login.
+- Cada id debe ser único en el DOM.
 
-### **Usuario con rol SOPORTE (ID: 5):**
-- Navegación: "Panel Soporte"  
-- Dropdown: "Panel Soporte"
-
-### **Usuario con rol CLIENTE (ID: 3):**
-- Navegación: "Mi Panel"
-- Dropdown: "Mi Panel"
-
----
-
-## 🛡️ **Seguridad implementada:**
-
-1. **Verificación de roles** en rutas protegidas
-2. **Acceso controlado** solo para Admin y Soporte
-3. **Redirección automática** para usuarios sin permisos
-4. **Detección dual** - Funciona con arrays de IDs y strings de rol
+### Solución
+- Cambia los `id` para que solo haya uno por cada input, o elimina los duplicados.
+- Ejemplo:
+  ```html
+  <input id="login-email" ... />
+  <!-- No debe haber otro input con id="login-email" en la misma página -->
+  ```
 
 ---
 
-## 🎯 **Estado actual:**
-- ✅ **Completamente funcional** - El rol SOPORTE tiene acceso total al dashboard
-- ✅ **Visualmente diferenciado** - Títulos y descripciones específicos
-- ✅ **Navegación consistente** - Funciona en desktop y móvil
-- ✅ **Seguridad implementada** - Solo usuarios autorizados pueden acceder
-
-El rol SOPORTE ahora puede gestionar usuarios, asignar roles y ver todas las estadísticas del sistema, con una interfaz claramente identificada como "Panel de Soporte".
+¿Dudas? Consulta al equipo backend o frontend según corresponda.

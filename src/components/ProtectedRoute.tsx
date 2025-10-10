@@ -30,9 +30,10 @@ export default function ProtectedRoute({
 
       // Si especifica roles y no tiene el rol necesario
       if (allowedRoles.length > 0 && user) {
-        const hasPermission = allowedRoles.some(roleId => 
-          user.roles?.includes(roleId) || user.role === getRoleName(roleId)
-        );
+        const hasPermission = allowedRoles.some(roleId => {
+          const userRoleStr = String(user.role || "").toLowerCase();
+          return user.roles?.includes(roleId) || userRoleStr === getRoleName(roleId);
+        });
         
         if (!hasPermission) {
           router.push(redirectTo);
@@ -45,12 +46,12 @@ export default function ProtectedRoute({
   // Función auxiliar para convertir ID de rol a nombre (alineado con backend)
   const getRoleName = (roleId: number): string => {
     const roleMap: Record<number, string> = {
-      1: "ADMIN",
-      2: "OPERADOR", 
-      3: "CLIENTE",
-      4: "SOPORTE"
+      1: "administrador",
+      2: "cliente",
+      3: "proveedor",
+      4: "soporte"
     };
-    return roleMap[roleId] || "";
+    return (roleMap[roleId] || "").toLowerCase();
   };
 
   // Mostrar loading mientras verifica permisos
@@ -71,9 +72,10 @@ export default function ProtectedRoute({
   }
 
   if (allowedRoles.length > 0 && user) {
-    const hasPermission = allowedRoles.some(roleId => 
-      user.roles?.includes(roleId) || user.role === getRoleName(roleId)
-    );
+    const hasPermission = allowedRoles.some(roleId => {
+      const userRoleStr = String(user.role || "").toLowerCase();
+      return user.roles?.includes(roleId) || userRoleStr === getRoleName(roleId);
+    });
     
     if (!hasPermission) {
       return null;

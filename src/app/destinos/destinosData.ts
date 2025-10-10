@@ -21,7 +21,7 @@ export const destinosEjemplo = [
     descripcion:
       "El lago navegable más alto del mundo, hogar de las místicas Islas del Sol y la Luna, cuna de la civilización inca.",
     calificacion: 4.8,
-    imagen: "/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "$85",
     duracion: "2 días",
     categoria: "cultural",
@@ -36,7 +36,7 @@ export const destinosEjemplo = [
     descripcion:
       "Explora la capital más alta del mundo con sus mercados coloridos, arquitectura colonial y teleféricos únicos.",
     calificacion: 4.7,
-    imagen: "/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "$60",
     duracion: "Día completo",
     categoria: "cultural",

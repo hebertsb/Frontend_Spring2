@@ -2,10 +2,10 @@
 // Simulación para verificar que el filtro funciona correctamente
 
 const ROLE_MAP = {
-  1: "ADMIN",
-  2: "OPERADOR", 
-  3: "CLIENTE",
-  4: "SOPORTE"
+  1: "administrador",
+  2: "cliente", 
+  3: "proveedor",
+  4: "soporte"
 };
 
 const testUsers = [
@@ -26,18 +26,18 @@ function testRoleFilter(users, filterRole) {
 }
 
 // Tests
-console.log("🧪 Test 1: Filtrar por SOPORTE");
-console.log(testRoleFilter(testUsers, "SOPORTE"));
+console.log("🧪 Test 1: Filtrar por soporte");
+console.log(testRoleFilter(testUsers, "soporte"));
 // Esperado: 2 usuarios (soporte@autonoma.edu.bo y blancobautistaluisfernando@gmail.com)
 
-console.log("\n🧪 Test 2: Filtrar por ADMIN");
-console.log(testRoleFilter(testUsers, "ADMIN"));
+console.log("\n🧪 Test 2: Filtrar por administrador");
+console.log(testRoleFilter(testUsers, "administrador"));
 // Esperado: 1 usuario (gabriel.moreno@autonoma.edu.bo)
 
 console.log("\n🧪 Test 3: Todos los roles");
 console.log(testRoleFilter(testUsers, "todos"));
 // Esperado: 5 usuarios (todos)
 
-console.log("\n🧪 Test 4: Filtrar por CLIENTE");
-console.log(testRoleFilter(testUsers, "CLIENTE"));
+console.log("\n🧪 Test 4: Filtrar por cliente");
+console.log(testRoleFilter(testUsers, "cliente"));
 // Esperado: 1 usuario (juan.perez@autonoma.edu.bo)

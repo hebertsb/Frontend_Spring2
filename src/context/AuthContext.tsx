@@ -1,6 +1,7 @@
 "use client";
 import React, { createContext, useState, useEffect, ReactNode } from "react";
 import { login as apiLogin, refresh as apiRefresh, getUser, logout as apiLogout } from "../api/auth";
+import { setAuthToken } from "@/api/axios";
 import { useRouter } from "next/navigation";
 
 // Agregar la propiedad avatar al tipo User
@@ -13,12 +14,14 @@ interface User {
   roles?: number[]; // Array de IDs de roles
 }
 
-// Mapeo de IDs de roles a nombres (alineado con backend)
+// Mapeo de IDs de roles a nombres (según contrato del backend)
+// Backend informó: 1: Administrador, 2: Cliente, 3: Proveedor, 4: Soporte
+// Guardamos los nombres en minúsculas para comparaciones consistentes.
 const ROLE_MAP: Record<number, string> = {
-  1: "ADMIN",
-  2: "OPERADOR",
-  3: "CLIENTE",
-  4: "SOPORTE"
+  1: "administrador",
+  2: "cliente",
+  3: "proveedor",
+  4: "soporte"
 };
 
 interface AuthContextType {
@@ -37,28 +40,86 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Normaliza el objeto raw que viene del backend a la forma que usa la app
+  const normalizeUser = (rawUser: any): User => {
+    if (!rawUser) return null as any;
+    // Obtener roles como array de números
+    let roles: number[] = [];
+    if (Array.isArray(rawUser.roles)) {
+      // roles puede ser array de ids o array de objetos {id: number}
+      roles = rawUser.roles.map((r: any) => (typeof r === "number" ? r : r?.id)).filter(Boolean);
+    } else if (rawUser.rol && typeof rawUser.rol === "object" && typeof rawUser.rol.id === "number") {
+      // Caso reportado por backend: rol como objeto { id, nombre }
+      roles = [rawUser.rol.id];
+    } else if (typeof rawUser.rol === "number") {
+      roles = [rawUser.rol];
+    } else if (typeof rawUser.perfil_id === "number") {
+      roles = [rawUser.perfil_id];
+    } else if (rawUser.profile_id && typeof rawUser.profile_id === "number") {
+      roles = [rawUser.profile_id];
+    }
+
+    // Nombre del usuario
+    const name = rawUser.nombre || rawUser.name || rawUser.full_name || rawUser.nombre_completo || rawUser.username || "Usuario";
+    const email = rawUser.email || "";
+    const avatar = rawUser.avatar || rawUser.avatar_url || rawUser.foto || "";
+
+    // Determinar role string (en minúsculas)
+    // Preferir rol.nombre cuando backend devuelve el objeto {id,nombre}
+    let roleStr: string = "";
+    if (rawUser.rol && typeof rawUser.rol === "object" && rawUser.rol.nombre) {
+      roleStr = String(rawUser.rol.nombre).toLowerCase();
+    } else if (rawUser.role) {
+      roleStr = String(rawUser.role).toLowerCase();
+    } else if (roles.length > 0) {
+      // Intentar mapear id -> nombre usando ROLE_MAP, o usar el id como fallback
+      roleStr = String(ROLE_MAP[roles[0]] || roles[0]).toLowerCase();
+    }
+
+    return { id: String(rawUser.id || rawUser.pk || rawUser.user_id || ""), name, email, avatar, role: roleStr, roles } as User;
+  };
+
   const reloadUser = async () => {
     setLoading(true);
     try {
       const userRes = await getUser();
       const rawUser = userRes.data;
-      // Si el backend retorna roles como array de números, mapea a string
-      let role = rawUser.role;
-      if (!role && Array.isArray(rawUser.roles) && rawUser.roles.length > 0) {
-        // Toma el primer rol como principal
-        role = ROLE_MAP[rawUser.roles[0]] || "CLIENTE";
+      const normalized = normalizeUser(rawUser);
+      setUser(normalized);
+    } catch (err: any) {
+      // Only force logout on 401 (invalid/expired token). If backend
+      // returns 403 (forbidden), keep the client token and stored user
+      // but stop loading — don't automatically log out.
+      const status = err?.response?.status;
+      if (status === 401) {
+        handleLogout();
+        return;
       }
-      setUser({ ...rawUser, role, roles: rawUser.roles });
-    } catch {
-      handleLogout();
+      // for 403 or other errors, just stop loading and keep existing user
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    const access = typeof window !== "undefined" ? localStorage.getItem("access") : null;
-    if (access) {
-      reloadUser();
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("authToken");
+      const storedUser = localStorage.getItem("user");
+      if (token) {
+        setAuthToken(token);
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            setUser(normalizeUser(parsed));
+          } catch {
+            // ignore
+          }
+        } else {
+          // If no stored user, attempt to refresh authoritative user data
+          reloadUser();
+        }
+      } else {
+        setLoading(false);
+      }
     } else {
       setLoading(false);
     }
@@ -68,9 +129,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleLogin = async (email: string, password: string) => {
     try {
       const res = await apiLogin(email, password);
-      localStorage.setItem("access", res.data.access);
-      localStorage.setItem("refresh", res.data.refresh);
-      await reloadUser();
+      // apiLogin returns { token, user }
+      const token = res.token || null;
+      const userFromRes = res.user || null;
+      if (token) setAuthToken(token);
+      if (userFromRes && typeof window !== "undefined") {
+        localStorage.setItem("user", JSON.stringify(userFromRes));
+        try {
+          setUser(normalizeUser(userFromRes));
+        } catch {
+          // ignore
+        }
+      }
+      // Do not force reloadUser immediately; leave it for mount or manual refresh
       return { success: true };
     } catch (error: unknown) {
       // Limpiar tokens en caso de error de login
@@ -106,25 +177,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const handleLogout = () => {
     apiLogout();
+    setAuthToken(null);
     setUser(null);
     router.push("/"); // Redirigir al inicio después del logout
   };
 
-  // Refrescar token automáticamente
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh") : null;
-      if (refreshToken) {
-        try {
-          const res = await apiRefresh(refreshToken);
-          localStorage.setItem("access", res.data.access);
-        } catch {
-          handleLogout();
-        }
-      }
-    }, 1000 * 60 * 10); // cada 10 minutos
-    return () => clearInterval(interval);
-  }, []);
+  // TokenAuth does not provide refresh by default. If refresh is implemented, keep logic here.
 
   return (
     <AuthContext.Provider value={{ user, login: handleLogin, logout: handleLogout, loading, reloadUser }}>

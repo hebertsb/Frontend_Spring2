@@ -29,6 +29,19 @@ const ChangePasswordForm = () => {
   useEffect(() => {
     const fetchUserEmail = async () => {
       try {
+        // Prefer local storage to avoid additional GET requests that may 403
+        const stored = localStorage.getItem("user");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed?.email) {
+              setUserEmail(parsed.email);
+              return;
+            }
+          } catch {
+            // fall through to getUser
+          }
+        }
         const response = await getUser();
         setUserEmail(response.data.email);
       } catch (error) {

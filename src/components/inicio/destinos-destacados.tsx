@@ -9,7 +9,7 @@ const destinosDestacados = [
     descripcion:
       "El desierto de sal más grande del mundo, un espejo natural que refleja el cielo creando paisajes surrealistas únicos en el planeta.",
     calificacion: 4.9,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $120",
   },
   {
@@ -19,7 +19,7 @@ const destinosDestacados = [
     descripcion:
       "El lago navegable más alto del mundo, hogar de las místicas Islas del Sol y la Luna, cuna de la civilización inca.",
     calificacion: 4.8,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $85",
   },
   {
@@ -29,7 +29,7 @@ const destinosDestacados = [
     descripcion:
       "La capital más alta del mundo, una ciudad vibrante entre montañas con mercados coloridos, arquitectura colonial y cultura indígena viva.",
     calificacion: 4.7,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $60",
   },
   {
@@ -39,7 +39,7 @@ const destinosDestacados = [
     descripcion:
       "Ciudad colonial Patrimonio de la Humanidad, famosa por sus minas de plata y arquitectura barroca perfectamente conservada.",
     calificacion: 4.6,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $45",
   },
   {
@@ -49,7 +49,7 @@ const destinosDestacados = [
     descripcion:
       "La ciudad blanca de Bolivia, capital constitucional con hermosa arquitectura colonial y un ambiente universitario vibrante.",
     calificacion: 4.7,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $55",
   },
   {
@@ -59,7 +59,7 @@ const destinosDestacados = [
     descripcion:
       "Conocido como la ciudad de la eterna primavera, famoso por su clima perfecto, gastronomía excepcional y el Cristo de la Concordia.",
     calificacion: 4.5,
-    imagen: "/src/public/placeholder.svg?height=400&width=600",
+  imagen: "/placeholder.svg",
     precio: "Desde $50",
   },
 ]

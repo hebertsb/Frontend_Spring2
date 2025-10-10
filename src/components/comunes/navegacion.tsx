@@ -46,12 +46,13 @@ export function Navegacion() {
               const { user } = auth;
               if (!user) return null;
               
-              // Verificar si el usuario es admin (rol 1 o rol "ADMIN")
-              const isAdmin = user?.roles?.includes(1) || user?.role === "ADMIN";
-              // Verificar si el usuario es soporte (rol 4 o rol "SOPORTE")  
-              const isSupport = user?.roles?.includes(4) || user?.role === "SOPORTE";
-              // Verificar si el usuario es cliente (rol 3 o rol "CLIENTE")
-              const isClient = user?.roles?.includes(3) || user?.role === "CLIENTE";
+              // Verificar si el usuario es admin (rol 1 o rol "admin")
+              const roleStr = String(user?.role || "").toLowerCase();
+              const isAdmin = user?.roles?.includes(1) || roleStr === "administrador";
+              // Verificar si el usuario es soporte (rol 4 o rol "soporte")  
+              const isSupport = user?.roles?.includes(4) || roleStr === "soporte";
+              // Verificar si el usuario es cliente (rol 3 o rol "cliente")
+              const isClient = user?.roles?.includes(3) || roleStr === "cliente";
               
               if (isAdmin) {
                 return <LoadingLink href="/panel">Panel Admin</LoadingLink>;
@@ -111,12 +112,13 @@ export function Navegacion() {
                 const { user } = auth;
                 if (!user) return null;
                 
-                // Verificar si el usuario es admin (rol 1 o rol "ADMIN")
-                const isAdmin = user?.roles?.includes(1) || user?.role === "ADMIN";
-                // Verificar si el usuario es soporte (rol 4 o rol "SOPORTE")
-                const isSupport = user?.roles?.includes(4) || user?.role === "SOPORTE";
-                // Verificar si el usuario es cliente (rol 3 o rol "CLIENTE")
-                const isClient = user?.roles?.includes(3) || user?.role === "CLIENTE";
+                // Verificar si el usuario es admin (rol 1 o rol "admin")
+                const roleStrMobile = String(user?.role || "").toLowerCase();
+                const isAdmin = user?.roles?.includes(1) || roleStrMobile === "administrador";
+                // Verificar si el usuario es soporte (rol 4 o rol "soporte")
+                const isSupport = user?.roles?.includes(4) || roleStrMobile === "soporte";
+                // Verificar si el usuario es cliente (rol 3 o rol "cliente")
+                const isClient = user?.roles?.includes(3) || roleStrMobile === "cliente";
                 
                 if (isAdmin) {
                   return (

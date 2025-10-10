@@ -12,12 +12,13 @@ import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivate
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 
-// Mapeo de IDs de roles a nombres (alineado con backend)
+// Mapeo de IDs de roles a nombres (según contrato del backend)
+// Backend: 1=Administrador, 2=Cliente, 3=Proveedor, 4=Soporte
 const ROLE_MAP: Record<number, string> = {
-  1: "ADMIN",
-  2: "OPERADOR", 
-  3: "CLIENTE",
-  4: "SOPORTE"
+  1: "administrador",
+  2: "cliente",
+  3: "proveedor",
+  4: "soporte"
 };
 
 interface User {
@@ -38,7 +39,7 @@ interface User {
   pais?: string;
 }
 
-const roles = ["ADMIN", "OPERADOR", "CLIENTE", "SOPORTE"];
+const roles = ["administrador", "cliente", "proveedor", "soporte"];
 
 
 const AdminDashboard = () => {
@@ -69,18 +70,20 @@ const AdminDashboard = () => {
 
   // Determinar el tipo de panel según el rol del usuario
   const getPanelTitle = () => {
-    if (currentUser?.roles?.includes(1) || currentUser?.role === "ADMIN") {
+    const roleStr = String(currentUser?.role || "").toLowerCase();
+    if (currentUser?.roles?.includes(1) || roleStr === "administrador") {
       return "Panel Administrativo - Turismo Bolivia";
-    } else if (currentUser?.roles?.includes(4) || currentUser?.role === "SOPORTE") {
+    } else if (currentUser?.roles?.includes(4) || roleStr === "soporte") {
       return "Panel de Soporte - Turismo Bolivia";
     }
     return "Panel de Gestión - Turismo Bolivia";
   };
 
   const getPanelDescription = () => {
-    if (currentUser?.roles?.includes(1) || currentUser?.role === "ADMIN") {
+    const roleStr = String(currentUser?.role || "").toLowerCase();
+    if (currentUser?.roles?.includes(1) || roleStr === "administrador") {
       return "Gestiona usuarios, roles y permisos de tu plataforma turística";
-    } else if (currentUser?.roles?.includes(4) || currentUser?.role === "SOPORTE") {
+    } else if (currentUser?.roles?.includes(4) || roleStr === "soporte") {
       return "Proporciona soporte y gestiona usuarios de la plataforma turística";
     }
     return "Gestiona tu plataforma turística";
@@ -431,12 +434,12 @@ const AdminDashboard = () => {
                       <div key={id} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div className={`w-3 h-3 rounded-full mr-3 ${
-                            name === 'ADMIN' ? 'bg-red-500' :
-                            name === 'OPERADOR' ? 'bg-purple-500' :
-                            name === 'CLIENTE' ? 'bg-yellow-500' :
-                            name === 'SOPORTE' ? 'bg-indigo-500' : 'bg-gray-500'
+                            name === 'administrador' ? 'bg-red-500' :
+                            name === 'proveedor' ? 'bg-purple-500' :
+                            name === 'cliente' ? 'bg-yellow-500' :
+                            name === 'soporte' ? 'bg-indigo-500' : 'bg-gray-500'
                           }`}></div>
-                          <span className="text-sm text-gray-700">{name}</span>
+                          <span className="text-sm text-gray-700">{String(name).charAt(0).toUpperCase() + String(name).slice(1)}</span>
                         </div>
                         <div className="text-right">
                           <span className="text-sm font-medium text-gray-900">{count}</span>
