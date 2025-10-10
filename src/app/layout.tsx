@@ -6,6 +6,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { LoadingLinkProvider } from "@/components/EfectoCarga/contexto";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import HydrationFix from "@/components/HydrationFix";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className={`${montserrat.variable} ${openSans.variable} h-full`}>
       <body className="font-sans antialiased min-h-screen w-full overflow-x-hidden overflow-y-auto">
+        <HydrationFix />
         <LoadingLinkProvider>
           <AuthProvider>
             <SidebarProvider>

@@ -9,7 +9,7 @@ export interface Paquete {
   calificacion: number;
   numeroReseñas: number;
   precio: string;
-  precioOriginal: string;
+  precioOriginal: string | null;
   duracion: string;
   maxPersonas: number;
   dificultad: string;

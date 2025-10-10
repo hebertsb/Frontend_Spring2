@@ -42,7 +42,7 @@ export type Paquete = {
   calificacion: number;
   numero_reseñas: number;
   precio: string;
-  precio_original: string;
+  precio_original: string | null;
   duracion: string;
   max_personas: number;
   dificultad: string;

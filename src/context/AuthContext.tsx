@@ -4,7 +4,7 @@ import { login as apiLogin, refresh as apiRefresh, getUser, logout as apiLogout 
 import { setAuthToken } from "@/api/axios";
 import { useRouter } from "next/navigation";
 
-// Agregar la propiedad avatar al tipo User
+// Interfaz completa del usuario alineada con backend
 interface User {
   id: string;
   name: string;
@@ -12,6 +12,14 @@ interface User {
   avatar: string; // Nueva propiedad para la URL del avatar
   role: string; // Rol del usuario (ADMIN, OPERADOR, etc)
   roles?: number[]; // Array de IDs de roles
+  // Campos adicionales del perfil del usuario
+  nombres?: string;
+  apellidos?: string;
+  telefono?: string;
+  fecha_nacimiento?: string;
+  genero?: string;
+  documento_identidad?: string;
+  pais?: string;
 }
 
 // Mapeo de IDs de roles a nombres (según contrato del backend)
