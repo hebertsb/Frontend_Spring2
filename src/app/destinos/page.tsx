@@ -39,28 +39,24 @@ export default function PaginaDestinos() {
   /**
    * 🔁 Adaptador: convierte los datos del backend a la interfaz Servicio del frontend
    */
-  const adaptarServicio = (apiData: any): Servicio => {
+  const adaptarServicio = (apiData: Servicio): Servicio => {
     return {
       id: apiData.id,
       titulo: apiData.titulo,
-      descripcion_servicio:
-        apiData.descripcion_servicio || apiData.descripcion || "",
-      tipo: apiData.categoria?.nombre || "General",
-      precio_usd: parseFloat(apiData.precio_usd) || 0,
-      categoria: apiData.categoria,
-      dias: apiData.duracion
-        ? parseInt(apiData.duracion)
-        : 1, // convierte "8h" o similar en número
+      precio_usd:apiData.precio_usd || "0.00",
+      categoria: apiData.categoria, 
+      duracion: apiData.duracion
+        ? apiData.duracion
+        : "1", 
       descripcion:
         apiData.descripcion ||
         "Sin descripción disponible. Consulte más información en el detalle del servicio.",
-      incluido:
+      servicios_incluidos:
         apiData.servicios_incluidos && Array.isArray(apiData.servicios_incluidos)
           ? apiData.servicios_incluidos
           : [],
-      calificacion: apiData.calificacion || 5,
-      visible_publico: true,
-      imagenes: apiData.imagen_url ? [apiData.imagen_url] : ["/placeholder.svg"],
+      estado: apiData.estado || "Activo",
+      imagen_url: apiData.imagen_url ? [apiData.imagen_url] : ["/placeholder.svg"],
       created_at: apiData.created_at || "",
       updated_at: apiData.updated_at || "",
     };
@@ -75,7 +71,7 @@ export default function PaginaDestinos() {
       try {
         console.log("🌍 Intentando cargar servicios desde API...");
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/servicios/`,
+          `${process.env.NEXT_PUBLIC_API_URL}/servicios/`,
           {
             cache: "no-store",
             headers: {
@@ -157,14 +153,14 @@ export default function PaginaDestinos() {
                   vistaActual === "grid" ? (
                     <TarjetaDestino
                       key={servicio.id}
-                      id={String(servicio.id)}
-                      nombre={servicio.titulo || ''}
-                      ubicacion={typeof servicio.categoria === 'string' ? servicio.categoria : servicio.categoria?.nombre || "Sin categoría"}
-                      descripcion={servicio.descripcion_servicio || servicio.descripcion || ''}
-                      calificacion={servicio.calificacion || 0}
-                      urlImagen={servicio.imagenes?.[0] || "/placeholder.svg"}
-                      precio={(servicio.precio_usd ?? 0).toString()}
-                      duracion={(servicio.dias ?? 1).toString()}
+                      id={servicio.id}
+                      nombre={servicio.titulo}
+                      ubicacion={servicio.categoria?.nombre || "Sin categoría"}
+                      descripcion={servicio.descripcion}
+                      calificacion={4.5}
+                      urlImagen={servicio.imagen_url?.[0] || "/placeholder.svg"}
+                      precio={servicio.precio_usd}
+                      duracion={servicio.duracion}
                     />
                   ) : (
                     <ItemListaDestino key={servicio.id} {...servicio} />
@@ -196,10 +192,7 @@ export default function PaginaDestinos() {
         </div>
       </div>
 
-      {/* Mostrar los datos en formato JSON (solo debug) */}
-      {/* <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-x-auto">
-        {JSON.stringify(Servicios, null, 2)}
-      </pre> */}
+  
 
       <PiePagina />
     </div>

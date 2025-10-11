@@ -26,7 +26,7 @@ export default async function Page({ params }: { params: { id: string } }) {
   try {
     console.log("🔍 Buscando destino con ID:", params.id);
     // Fetch de datos del destino
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/servicios/${params.id}`, { 
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/${params.id}`, { 
       cache: "no-store",
       headers: {
         'Accept': 'application/json',
