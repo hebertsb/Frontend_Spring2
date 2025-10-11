@@ -7,7 +7,7 @@ import { Servicio } from "@/lib/servicios";
 import { useRouter } from "next/navigation";
 
 interface PropsTarjetaDestino {
-  id: string;
+  id: number;
   nombre: string;
   ubicacion: string;
   descripcion: string;
@@ -47,7 +47,7 @@ export function TarjetaDestino({
         />
         {precio && (
           <div className="absolute px-3 py-1 text-sm font-semibold text-white rounded-full shadow-lg top-4 right-4 bg-amber-500">
-            Bs. {precio}
+            USD. {precio}
           </div>
         )}
       </div>

@@ -10,12 +10,12 @@ export interface Servicio {
   updated_at: string | null;
   titulo: string;
   descripcion: string;
-  duracion: string; // ejemplo: "4h"
+  duracion: string; 
   capacidad_max: number;
   punto_encuentro: string;
   estado: string;
   imagen_url: string; // URL directa (no arreglo)
-  precio_usd: string | number; // puede venir como "90.00" o 90
+  precio_usd: string ; // puede venir como "90.00" o 90
   servicios_incluidos: string[]; // array de strings ["Guía", "Hotel", ...]
 }
 

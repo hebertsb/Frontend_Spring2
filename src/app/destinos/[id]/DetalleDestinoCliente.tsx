@@ -33,7 +33,9 @@ export default function DetalleDestinoCliente({
   const router = useRouter();
 
   useEffect(() => {
-    if (destino) setTitulo(destino.titulo);
+    if (destino) {
+      setTitulo(destino.titulo);
+    }
   }, [destino]);
 
   const manejarFavorito = () => {
@@ -41,8 +43,8 @@ export default function DetalleDestinoCliente({
     toast({
       title: esFavorito ? "Eliminado de favoritos" : "Agregado a favoritos",
       description: esFavorito
-        ? `${destino.titulo} ha sido eliminado de tus favoritos`
-        : `${destino.titulo} ha sido agregado a tus favoritos`,
+        ? `${destino?.titulo} ha sido eliminado de tus favoritos`
+        : `${destino?.titulo} ha sido agregado a tus favoritos`,
     });
   };
 
@@ -50,8 +52,8 @@ export default function DetalleDestinoCliente({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: destino.titulo,
-          text: destino.descripcion,
+          title: destino?.titulo,
+          text: destino?.descripcion || destino?.descripcion,
           url: window.location.href,
         });
       } catch (error) {
@@ -81,8 +83,8 @@ export default function DetalleDestinoCliente({
       nombre: destino.titulo,
       precio: destino.precio_usd.toString(),
     });
-
-    router.push(`/reserva?${params.toString()}`);
+    // console.log(params)
+     router.push(`/reserva?${params.toString()}`);
   };
 
   if (!destino) {
@@ -104,8 +106,8 @@ export default function DetalleDestinoCliente({
     );
   }
 
-  // ✅ Imagen corregida (usa imagen_url)
-  const imagenPrincipal = destino.imagen_url || "/placeholder.svg";
+  const imagenPrincipal =
+     destino.imagen_url || "/placeholder.svg";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
@@ -159,11 +161,13 @@ export default function DetalleDestinoCliente({
                   variant="secondary"
                   className="bg-blue-100 text-blue-700"
                 >
-                  {destino.categoria?.nombre || "Turismo"}
+                  {destino.categoria.nombre ||  "Turismo"}
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">5.0</span>
+                  <span className="font-medium">
+                    { 4.5}
+                  </span>
                 </div>
               </div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -171,7 +175,7 @@ export default function DetalleDestinoCliente({
               </h1>
               <div className="flex items-center gap-2 text-gray-600">
                 <MapPin className="h-4 w-4" />
-                <span>{destino.punto_encuentro}</span>
+                <span>{destino.punto_encuentro || "Destino turístico"}</span>
               </div>
             </div>
 
@@ -185,14 +189,16 @@ export default function DetalleDestinoCliente({
                 <Clock className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Duración</p>
-                  <p className="font-medium">{destino.duracion}</p>
+                  <p className="font-medium">
+                    {destino.duracion} 
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
                 <Users className="h-5 w-5 text-green-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Capacidad máxima</p>
-                  <p className="font-medium">{destino.capacidad_max} personas</p>
+                  <p className="text-sm text-gray-600">Tipo</p>
+                  <p className="font-medium">{destino.categoria.nombre || "General"}</p>
                 </div>
               </div>
             </div>
@@ -203,10 +209,7 @@ export default function DetalleDestinoCliente({
                 <div>
                   <p className="text-sm text-gray-600">Precio por persona</p>
                   <p className="text-3xl font-bold text-blue-700">
-                    USD{" "}
-                    {typeof destino.precio_usd === "string"
-                      ? destino.precio_usd
-                      : destino.precio_usd.toFixed(2)}
+                    USD {destino.precio_usd?.toString() || "0.00"}
                   </p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
@@ -230,8 +233,7 @@ export default function DetalleDestinoCliente({
               Qué incluye
             </h3>
             <ul className="space-y-2 text-gray-700">
-              {destino.servicios_incluidos &&
-              destino.servicios_incluidos.length > 0 ? (
+              {destino.servicios_incluidos && destino.servicios_incluidos.length > 0 ? (
                 destino.servicios_incluidos.map((item, index) => (
                   <li key={index} className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
@@ -248,6 +250,10 @@ export default function DetalleDestinoCliente({
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     Transporte básico
                   </li>
+                  <li className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Entradas incluidas
+                  </li>
                 </>
               )}
             </ul>
@@ -256,19 +262,34 @@ export default function DetalleDestinoCliente({
           <Card className="p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Información adicional
+              Descripción adicional
             </h3>
             <div className="text-gray-700">
-              {destino.estado ? (
-                <p>Estado actual: {destino.estado}</p>
+              {destino.descripcion ? (
+                <p>{destino.categoria.nombre}</p>
               ) : (
-                <p>No hay información adicional disponible.</p>
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Alimentación no incluida
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Gastos personales
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    Propinas opcionales
+                  </li>
+                </ul>
               )}
             </div>
           </Card>
         </div>
       </div>
-
+      {/* <pre className="bg-gray-100 p-4 rounded-md text-sm overflow-x-auto">
+        {JSON.stringify(destino, null, 2)}
+      </pre> */}
       <PiePagina />
     </div>
   );
