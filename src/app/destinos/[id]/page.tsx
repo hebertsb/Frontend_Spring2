@@ -48,7 +48,8 @@ export default async function Page({ params }: { params: { id: string } }) {
   } catch (err) {
     console.warn('⚠️ Error al cargar destino desde API, buscando en datos de fallback:', err);
     // Buscar en datos de fallback
-    destino = serviciosFallback.find(s => s.id === params.id) || null;
+  // normalizar comparación: los ids en el fallback pueden ser number
+  destino = serviciosFallback.find(s => String(s.id) === String(params.id)) || null;
     if (destino) {
       console.log("📦 Destino encontrado en fallback:", destino.titulo);
     } else {

@@ -80,7 +80,7 @@ export const prepararReservaServicio = (
 ) => {
   // Detectar correctamente el precio del servicio (precio_usd, precio, o costo)
   const precio = parseFloat(
-    servicio.precio_usd ?? servicio.precio ?? servicio.costo ?? 0
+    String(servicio.precio_usd ?? (servicio as any).precio ?? (servicio as any).costo ?? 0)
   )
 
   console.log('🎯 Preparando reserva para SERVICIO:', {

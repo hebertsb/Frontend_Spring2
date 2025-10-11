@@ -56,7 +56,15 @@ export default function PaginaDestinos() {
           ? apiData.servicios_incluidos
           : [],
       estado: apiData.estado || "Activo",
-      imagen_url: apiData.imagen_url ? [apiData.imagen_url] : ["/placeholder.svg"],
+      // normalizar imagen_url: aceptar string o string[] según lo que venga
+      imagen_url: Array.isArray(apiData.imagen_url)
+        ? apiData.imagen_url
+        : apiData.imagen_url
+        ? apiData.imagen_url
+        : "/placeholder.svg",
+      proveedor: (apiData as any).proveedor || { id: 0, rol: { id: 0, created_at: null, updated_at: null, nombre: 'Proveedor' }, created_at: null, updated_at: null, nombre: 'Proveedor', rubro: null, num_viajes: 0, telefono: null, fecha_nacimiento: null, genero: null, documento_identidad: null, pais: null, user: 0 },
+      capacidad_max: (apiData as any).capacidad_max || 1,
+      punto_encuentro: (apiData as any).punto_encuentro || '',
       created_at: apiData.created_at || "",
       updated_at: apiData.updated_at || "",
     };

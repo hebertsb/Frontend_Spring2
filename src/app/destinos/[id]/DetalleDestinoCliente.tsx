@@ -107,8 +107,9 @@ export default function DetalleDestinoCliente({
     );
   }
 
-  const imagenPrincipal =
-     destino.imagen_url || "/placeholder.svg";
+  const imagenPrincipal = Array.isArray(destino.imagen_url)
+    ? destino.imagen_url[0]
+    : destino.imagen_url || "/placeholder.svg";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">

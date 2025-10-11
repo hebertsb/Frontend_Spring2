@@ -7,7 +7,7 @@ import { Servicio } from "@/lib/servicios";
 import { useRouter } from "next/navigation";
 
 interface PropsTarjetaDestino {
-  id: number;
+  id: number | string;
   nombre: string;
   ubicacion: string;
   descripcion: string;

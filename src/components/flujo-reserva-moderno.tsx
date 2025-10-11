@@ -544,8 +544,9 @@ export default function FlujoReservaModerno({
       payloadReserva.estado = "PENDIENTE";
 
       // ✅ Agregar total y fecha reales
-      payloadReserva.total = calcularTotal(); // 💰 total calculado
-      payloadReserva.fecha = formulario.detalles.fecha_inicio; // 📅 fecha del viaje
+  payloadReserva.total = String(calcularTotal()); // 💰 total calculado
+  // asignaciones opcionales: algunos tipos pueden no tener esos campos definidos en la interfaz
+  (payloadReserva as any).fecha = formulario.detalles.fecha_inicio; // 📅 fecha del viaje
 
       // Actualizar fecha en detalles
       if (payloadReserva.detalles) {
@@ -589,12 +590,12 @@ export default function FlujoReservaModerno({
 
       // Cupón opcional
       if (formulario.detalles.codigo_cupon.trim()) {
-        payloadReserva.cupon_codigo = formulario.detalles.codigo_cupon.trim();
+        (payloadReserva as any).cupon_codigo = formulario.detalles.codigo_cupon.trim();
       }
 
       // Notas opcionales
       if (formulario.detalles.notas_adicionales.trim()) {
-        payloadReserva.notas = formulario.detalles.notas_adicionales.trim();
+        (payloadReserva as any).notas = formulario.detalles.notas_adicionales.trim();
       }
 
       console.log(

@@ -24,7 +24,7 @@ export function ItemListaDestino({
           {/* Imagen principal */}
           <div className="relative w-full h-48 overflow-hidden sm:w-80 sm:h-auto">
             <Image
-              src={imagen_url || "/placeholder.svg"}
+              src={Array.isArray(imagen_url) ? imagen_url[0] : imagen_url || "/placeholder.svg"}
               alt={titulo}
               fill
               className="object-cover w-full h-full"

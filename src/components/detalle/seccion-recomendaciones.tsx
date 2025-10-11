@@ -26,7 +26,7 @@ export function SeccionRecomendaciones({ recomendaciones }: PropsSeccionRecomend
         {recomendaciones.map((recomendacion, index) => (
           <div key={recomendacion.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.1}s` }}>
             <TarjetaDestino
-              id={recomendacion.id}
+              id={Number(recomendacion.id)}
               nombre={recomendacion.nombre}
               ubicacion={recomendacion.ubicacion}
               descripcion={recomendacion.descripcion}
