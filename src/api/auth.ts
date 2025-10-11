@@ -184,12 +184,38 @@ export const resetPassword = async (token: string, password: string, password_co
   return api.post("/auth/resetear-password/", { token, password, password_confirm });
 };
 
-export const logout = () => {
-  // Backend logout endpoint is optional for TokenAuth. To avoid noisy 404s
-  // we simply clear client-side token and user here. If your backend
-  // implements /logout/ and you want to call it, re-enable the call.
-  setAuthToken(null);
-  if (typeof window !== "undefined") {
-    localStorage.removeItem("user");
+export const logout = async () => {
+  // Try to call the backend logout endpoint so the server can register the
+  // "Salida" action in the bitácora. We keep a tolerant fallback strategy:
+  //  - If /logout/ exists and responds (204 or 200), we clear client-side token.
+  //  - If the endpoint returns 404 (not implemented) we still clear client token.
+  //  - If the request fails for other reasons, attempt a fallback that sends
+  //    the token in the body. In any case, we avoid leaving the token in
+  //    client storage permanently.
+  try {
+    // axios interceptor will add Authorization header from localStorage if present
+    await api.post("/logout/");
+  } catch (err: any) {
+    const status = err?.response?.status;
+    // If endpoint not found (404) or unauthorized, proceed to clear token locally
+    if (status === 404 || status === 401 || status === 400) {
+      // nothing else to do; server doesn't support logout or token already invalid
+    } else {
+      // Try fallback: send token explicitly in the body (some backends accept this)
+      try {
+        if (typeof window !== "undefined") {
+          const token = localStorage.getItem("authToken");
+          if (token) {
+            await api.post("/logout/", { token });
+          }
+        }
+      } catch (e) {
+        // swallow fallback errors; we'll still clear client state below
+      }
+    }
+  } finally {
+    // Always clear client-side token and cached user after attempting logout.
+    setAuthToken(null);
+    if (typeof window !== "undefined") localStorage.removeItem("user");
   }
 };

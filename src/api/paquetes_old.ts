@@ -141,7 +141,7 @@ export const prepararReservaPaquete = async (paquete: any, cantidadPersonas: num
   detalles.push({
     // CAMBIO CRÍTICO: En lugar de usar un servicio existente,
     // vamos a usar el ID del paquete como si fuera un "servicio especial"
-    servicio: servicioContenedor.id, // Usar servicio existente como contenedor
+    servicio: paquete.id, // Usar el ID del paquete como identificador del item
     cantidad: cantidadPersonas,
     precio_unitario: precioPorPersona.toFixed(2), // PRECIO DEL PAQUETE
     fecha_servicio: new Date().toISOString(),

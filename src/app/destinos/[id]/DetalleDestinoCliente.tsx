@@ -29,7 +29,8 @@ export default function DetalleDestinoCliente({
   destino: Servicio;
 }) {
   const [esFavorito, setEsFavorito] = useState(false);
-  const [titulo, setTitulo] = useState("");
+  const [titulo, setTitulo] = useState<string>("",
+  );
   const router = useRouter();
 
   useEffect(() => {
@@ -79,9 +80,9 @@ export default function DetalleDestinoCliente({
     }
 
     const params = new URLSearchParams({
-      servicio: destino.id.toString(),
-      nombre: destino.titulo,
-      precio: destino.precio_usd.toString(),
+      servicio: destino.id?.toString() || "",
+      nombre: destino.titulo || "",
+      precio: destino.precio_usd !== undefined ? destino.precio_usd.toString() : "0",
     });
     // console.log(params)
      router.push(`/reserva?${params.toString()}`);
@@ -123,7 +124,7 @@ export default function DetalleDestinoCliente({
           <div className="relative">
             <Image
               src={imagenPrincipal}
-              alt={destino.titulo}
+                    alt={destino.titulo || 'imagen-destino'}
               width={600}
               height={400}
               className="w-full h-[400px] object-cover rounded-2xl shadow-lg"
