@@ -125,7 +125,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
         documento_identidad: form.documento_identidad || undefined,
         pais: form.pais || undefined,
         rol: Number(form.rol),
-        rubro: form.rubro || undefined,
+  rubro: form.rubro,
       };
 
       await register(payload as any);
@@ -331,19 +331,7 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
                 {errors.telefono && <p id="error-telefono" className="text-sm text-red-500">{errors.telefono}</p>}
               </div>
 
-              <div className="grid min-w-0 gap-2">
-                <Label htmlFor="register-rubro">Rubro (opcional)</Label>
-                <Input
-                  id="register-rubro"
-                  name="rubro"
-                  type="text"
-                  placeholder="Ej: Agencia de viajes"
-                  value={form.rubro}
-                  onChange={handleChange}
-                  className={cn("w-full", errors.rubro && "border-red-500")}
-                />
-                {errors.rubro && <p className="text-sm text-red-500">{errors.rubro}</p>}
-              </div>
+              {/* Rubro enviado por defecto como cadena vacía; campo oculto en UI */}
 
               <div className="grid min-w-0 gap-2">
                 <Label htmlFor="register-pais">
