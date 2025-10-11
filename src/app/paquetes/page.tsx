@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-import { Paquete } from "./datos";  // Importar el tipo Paquete
+import { Paquete as PaqueteSample, paquetesData } from "./paquetesData";
 import { Navegacion } from "@/components/comunes/navegacion";
 import { Breadcrumbs } from "@/components/comunes/breadcrumbs";
 import { PiePagina } from "@/components/comunes/pie-pagina";
@@ -15,7 +15,8 @@ import Link from "next/link";
 
 
 export default function PaginaPaquetes() {
-  const [paquetesFiltrados, setPaquetesFiltrados] = useState(paquetesData);
+  const [paquetes, setPaquetes] = useState<PaqueteSample[]>(paquetesData || []);
+  const [paquetesFiltrados, setPaquetesFiltrados] = useState<PaqueteSample[]>(paquetesData || []);
   const [terminoBusqueda, setTerminoBusqueda] = useState("");
   const [categoriaFiltro, setCategoriaFiltro] = useState("");
   const [dificultadFiltro, setDificultadFiltro] = useState("");
@@ -25,7 +26,7 @@ export default function PaginaPaquetes() {
   useEffect(() => {
     const fetchPaquetes = async () => {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/paquetes/`);
-      const data: Paquete[] = await response.json();
+  const data: PaqueteSample[] = await response.json();
       setPaquetes(data);
       setPaquetesFiltrados(data);
     };
@@ -37,7 +38,7 @@ export default function PaginaPaquetes() {
 
     // Filtrar por término de búsqueda
     if (terminoBusqueda) {
-      paquetesFiltrados = paquetesFiltrados.filter(paquete =>
+      filtrados = filtrados.filter((paquete: PaqueteSample) =>
         paquete.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
         paquete.ubicacion.toLowerCase().includes(terminoBusqueda.toLowerCase()) ||
         paquete.descripcionCorta.toLowerCase().includes(terminoBusqueda.toLowerCase())
@@ -46,14 +47,14 @@ export default function PaginaPaquetes() {
 
     // Filtrar por categoría
     if (categoriaFiltro) {
-      paquetesFiltrados = paquetesFiltrados.filter(paquete =>
+      filtrados = filtrados.filter((paquete: PaqueteSample) =>
         paquete.categoria.toLowerCase() === categoriaFiltro.toLowerCase()
       );
     }
 
     // Filtrar por dificultad
     if (dificultadFiltro) {
-      paquetesFiltrados = paquetesFiltrados.filter(paquete =>
+      filtrados = filtrados.filter((paquete: PaqueteSample) =>
         paquete.dificultad.toLowerCase() === dificultadFiltro.toLowerCase()
       );
     }
@@ -61,29 +62,29 @@ export default function PaginaPaquetes() {
     // Ordenar
     switch (ordenarPor) {
       case "precio-asc":
-        paquetesFiltrados.sort((a, b) => {
-          const precioA = parseInt(a.precio.replace(/[^\d]/g, ''));
-          const precioB = parseInt(b.precio.replace(/[^\d]/g, ''));
+  filtrados.sort((a: PaqueteSample, b: PaqueteSample) => {
+          const precioA = parseInt(a.precio.replace(/[^\d]/g, '')) || 0;
+          const precioB = parseInt(b.precio.replace(/[^\d]/g, '')) || 0;
           return precioA - precioB;
         });
         break;
       case "precio-desc":
-        paquetesFiltrados.sort((a, b) => {
-          const precioA = parseInt(a.precio.replace(/[^\d]/g, ''));
-          const precioB = parseInt(b.precio.replace(/[^\d]/g, ''));
+  filtrados.sort((a: PaqueteSample, b: PaqueteSample) => {
+          const precioA = parseInt(a.precio.replace(/[^\d]/g, '')) || 0;
+          const precioB = parseInt(b.precio.replace(/[^\d]/g, '')) || 0;
           return precioB - precioA;
         });
         break;
       case "calificacion":
-        paquetesFiltrados.sort((a, b) => b.calificacion - a.calificacion);
+  filtrados.sort((a: PaqueteSample, b: PaqueteSample) => b.calificacion - a.calificacion);
         break;
       default:
         // Mantener orden original por relevancia
         break;
     }
 
-    setPaquetesFiltrados(paquetesFiltrados);
-  };
+    setPaquetesFiltrados(filtrados);
+  }, [terminoBusqueda, categoriaFiltro, dificultadFiltro, ordenarPor, paquetes]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
@@ -148,7 +149,7 @@ export default function PaginaPaquetes() {
         {/* Resultado de búsqueda */}
         <div className="mb-6">
           <p className="text-gray-600">
-            Mostrando {paquetesFiltrados.length} de {paquetesData.length} paquetes
+            Mostrando {paquetesFiltrados.length} de {paquetes.length} paquetes
           </p>
         </div>
 

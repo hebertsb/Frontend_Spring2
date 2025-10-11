@@ -25,13 +25,13 @@ export function ItemListaDestino({
           {/* Imagen */}
           <div className="relative w-full h-48 overflow-hidden sm:w-80 sm:h-auto">
             <Image
-              src={urlImagen || "/placeholder.svg"}
-              alt={nombre}
+              src={imagenes?.[0] || "/placeholder.svg"}
+              alt={titulo}
               fill
               className="object-cover w-full h-full"
             />
             <div className="absolute px-2 py-1 text-xs font-semibold rounded top-3 left-3 bg-primary text-primary-foreground">
-              {categoria.nombre}
+              {typeof categoria === 'string' ? categoria : categoria?.nombre}
             </div>
           </div>
 

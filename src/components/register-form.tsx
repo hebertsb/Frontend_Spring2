@@ -1,9 +1,12 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { register } from "@/api/auth";
 import { User, Mail, Lock, Phone, Calendar, FileText, Globe, Users } from "lucide-react";
 
@@ -18,13 +21,15 @@ interface FormData {
   genero: string;
   documento_identidad: string;
   pais: string;
+  rol: string; // stored as string in form state, converted to number on submit
+  rubro: string;
 }
-
 interface FormErrors {
   [key: string]: string;
 }
 
 export function RegisterForm({ className, ...props }: React.ComponentProps<"form">) {
+  const router = useRouter();
   const [form, setForm] = useState<FormData>({
     nombres: "",
     apellidos: "",
@@ -36,6 +41,8 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
     genero: "",
     documento_identidad: "",
     pais: "",
+    rol: "2", // default to Cliente (id 2)
+    rubro: "",
   });
   const [errors, setErrors] = useState<FormErrors>({});
   const [success, setSuccess] = useState("");
@@ -105,8 +112,24 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
 
     setLoading(true);
     try {
-      await register(form);
-      setSuccess("Usuario registrado correctamente. Ahora puedes iniciar sesión.");
+      // Construir payload con tipos correctos; backend espera rol como entero
+      const payload = {
+        nombres: form.nombres,
+        apellidos: form.apellidos,
+        email: form.email,
+        password: form.password,
+        password_confirm: form.password_confirm,
+        telefono: form.telefono || undefined,
+        fecha_nacimiento: form.fecha_nacimiento || undefined,
+        genero: form.genero || undefined,
+        documento_identidad: form.documento_identidad || undefined,
+        pais: form.pais || undefined,
+        rol: Number(form.rol),
+        rubro: form.rubro || undefined,
+      };
+
+      await register(payload as any);
+      setSuccess("Usuario registrado correctamente. Ahora serás redirigido al login...");
       setForm({
         nombres: "",
         apellidos: "",
@@ -118,7 +141,15 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
         genero: "",
         documento_identidad: "",
         pais: "",
+        rol: "2",
+        rubro: "",
       });
+      // Small delay so user sees the success message, then redirect to login
+      console.log('[RegisterForm] registro exitoso, redirigiendo a /login');
+      setTimeout(() => {
+        console.log('[RegisterForm] ejecutando router.push(/login)');
+        router.push('/login');
+      }, 800);
     } catch (err: unknown) {
       const e = err as {
         code?: string;
@@ -298,6 +329,20 @@ export function RegisterForm({ className, ...props }: React.ComponentProps<"form
                   className={cn("w-full", errors.telefono && "border-red-500")}
                 />
                 {errors.telefono && <p id="error-telefono" className="text-sm text-red-500">{errors.telefono}</p>}
+              </div>
+
+              <div className="grid min-w-0 gap-2">
+                <Label htmlFor="register-rubro">Rubro (opcional)</Label>
+                <Input
+                  id="register-rubro"
+                  name="rubro"
+                  type="text"
+                  placeholder="Ej: Agencia de viajes"
+                  value={form.rubro}
+                  onChange={handleChange}
+                  className={cn("w-full", errors.rubro && "border-red-500")}
+                />
+                {errors.rubro && <p className="text-sm text-red-500">{errors.rubro}</p>}
               </div>
 
               <div className="grid min-w-0 gap-2">

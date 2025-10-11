@@ -47,6 +47,8 @@ export const register = async (data: {
   genero?: string;
   documento_identidad?: string;
   pais?: string;
+  rol: number | string; // backend expects an integer id; form may send string
+  rubro?: string;
 }) => {
   // Ensure required fields for this backend (nombre, rubro, rol) are present at call site
   const res = await api.post("/register/", data);
