@@ -10,6 +10,7 @@ import { ChartAreaInteractive } from "./chart-area-interactive";
 import { useEffect } from 'react';
 import AdminBitacora from './admin-bitacora';
 import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser } from "@/api/auth";
+import { listarBackups, crearBackup, restaurarBackup, descargarBackup, eliminarBackup } from '@/api/backups_restore';
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 
@@ -295,6 +296,116 @@ const AdminDashboard = () => {
     }
   };
 
+  // Backups state
+  const [backups, setBackups] = useState<any[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [creatingBackup, setCreatingBackup] = useState(false);
+  // Restore modal state
+  const [showRestoreModal, setShowRestoreModal] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
+  const [restoreOption, setRestoreOption] = useState<'total' | 'backend' | 'db'>('total');
+
+  const fetchBackups = async () => {
+    try {
+      setBackupsLoading(true);
+      const res = await listarBackups();
+      const list = Array.isArray(res.data) ? res.data : (res.data?.backups || []);
+      setBackups(list);
+      toast({ title: 'Backups listados', description: `Encontrados ${list.length} backups.` });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: 'Error', description: 'No se pudo listar backups', variant: 'destructive' });
+    } finally {
+      setBackupsLoading(false);
+    }
+  };
+
+  const handleCreateBackup = async () => {
+    try {
+      setCreatingBackup(true);
+      await crearBackup();
+      toast({ title: 'Backup creado', description: 'Backup creado correctamente.' });
+      await fetchBackups();
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: 'Error', description: 'No se pudo crear backup', variant: 'destructive' });
+    } finally {
+      setCreatingBackup(false);
+    }
+  };
+
+  const handleDownload = async (filename: string) => {
+    try {
+      const res = await descargarBackup(filename);
+      if (res?.url) {
+        const a = document.createElement('a');
+        a.href = res.url;
+        // usar filename devuelto por el servidor si existe
+        const filenameToUse = res.filename || filename;
+        a.download = filenameToUse;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        // revoke after a while
+        setTimeout(() => URL.revokeObjectURL(res.url), 10000);
+        toast({ title: 'Descarga iniciada', description: `Descargando ${filenameToUse}` });
+      } else {
+        toast({ title: 'Error', description: 'No se pudo obtener archivo', variant: 'destructive' });
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: 'Error', description: 'Error al descargar backup', variant: 'destructive' });
+    }
+  };
+
+  // Abrir modal de restauración con opciones
+  const handleRestore = (filename: string) => {
+    setRestoreTarget(filename);
+    setRestoreOption('total');
+    setShowRestoreModal(true);
+  };
+
+  const confirmRestore = async () => {
+    if (!restoreTarget) return;
+    // Mapear opción a flags esperados por la API
+    const options = {
+      restore_code: restoreOption !== 'db', // backend/code restored for 'total' and 'backend'
+      restore_db: restoreOption !== 'backend', // db restored for 'total' and 'db'
+    } as { restore_code?: boolean; restore_db?: boolean };
+
+    try {
+      setShowRestoreModal(false);
+      toast({ title: 'Iniciando restauración', description: `Restaurando ${restoreTarget} (${restoreOption})` });
+      await restaurarBackup(restoreTarget, options);
+      toast({ title: 'Restauración solicitada', description: 'La restauración fue enviada al servidor.' });
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: 'Error', description: 'No se pudo restaurar backup', variant: 'destructive' });
+    } finally {
+      setRestoreTarget(null);
+      setRestoreOption('total');
+    }
+  };
+
+  const cancelRestore = () => {
+    setShowRestoreModal(false);
+    setRestoreTarget(null);
+    setRestoreOption('total');
+  };
+
+  const handleDelete = async (filename: string) => {
+    const ok = confirm(`¿Eliminar backup ${filename}? Esta acción es irreversible.`);
+    if (!ok) return;
+    try {
+      await eliminarBackup(filename);
+      toast({ title: 'Backup eliminado', description: `${filename} eliminado correctamente.` });
+      await fetchBackups();
+    } catch (err: any) {
+      console.error(err);
+      toast({ title: 'Error', description: 'No se pudo eliminar backup', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
 
@@ -329,6 +440,12 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab("bitacora")}
         >
           Bitácora
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg font-semibold ${activeTab === "backups" ? "bg-blue-600 text-white" : "bg-white text-blue-600 border border-blue-600"}`}
+          onClick={() => setActiveTab("backups")}
+        >
+          Backups
         </button>
       </div>
 
@@ -417,6 +534,8 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* Backups - (moved to its own tab) */}
 
           {/* Gráfico de actividad */}
           <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
@@ -746,7 +865,7 @@ const AdminDashboard = () => {
           )}
         </>
       )}
-      {/* Vista Bitácora */}
+  {/* Vista Bitácora */}
       {activeTab === "bitacora" && (
         <div className="mt-6">
           {/* Carga perezosa simple del componente de bitácora */}
@@ -760,6 +879,94 @@ const AdminDashboard = () => {
               </div>
             </div>
           </React.Suspense>
+        </div>
+      )}
+      {/* Vista Backups */}
+      {activeTab === "backups" && (
+        <div className="mt-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Backups del sistema</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-md font-semibold hover:from-green-600"
+                  onClick={handleCreateBackup}
+                  disabled={creatingBackup}
+                >
+                  {creatingBackup ? 'Creando...' : 'Crear Backup'}
+                </button>
+                <button
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-md text-gray-700 font-medium"
+                  onClick={fetchBackups}
+                  disabled={backupsLoading}
+                >
+                  {backupsLoading ? 'Listando...' : 'Listar Backups'}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              {backupsLoading && <div className="text-sm text-gray-500">Cargando backups...</div>}
+              {!backupsLoading && backups.length === 0 && <div className="text-sm text-gray-500">No se encontraron backups. Pulsa "Listar Backups".</div>}
+              {!backupsLoading && backups.length > 0 && (
+                <div className="space-y-2">
+                  {backups.map((b: any) => {
+                    const filename = b.filename || b.name || String(b);
+                    const date = b.date || b.created_at || '';
+                    return (
+                      <div key={filename} className="flex items-center justify-between p-3 border rounded-md">
+                        <div>
+                          <div className="font-medium text-gray-900 break-words">{filename}</div>
+                          {date && <div className="text-xs text-gray-500">{date}</div>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button className="px-2 py-1 bg-blue-50 text-blue-700 rounded" onClick={() => handleDownload(filename)}>Descargar</button>
+                          <button className="px-2 py-1 bg-yellow-50 text-yellow-700 rounded" onClick={() => handleRestore(filename)}>Restaurar</button>
+                          <button className="px-2 py-1 bg-red-50 text-red-700 rounded" onClick={() => handleDelete(filename)}>Eliminar</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de restauración (renderizado globalmente para que funcione desde la pestaña Backups) */}
+      {showRestoreModal && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md border border-blue-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Restaurar backup</h2>
+            <p className="text-sm text-gray-600 mb-4">Seleccione qué tipo de restauración desea ejecutar para <strong>{restoreTarget}</strong>:</p>
+            <div className="space-y-3 mb-6">
+              <label className="flex items-center gap-3">
+                <input type="radio" name="restoreOption" value="total" checked={restoreOption === 'total'} onChange={() => setRestoreOption('total')} />
+                <div>
+                  <div className="font-medium">Restauración completa (total)</div>
+                  <div className="text-xs text-gray-500">Restaurará código/backend y base de datos.</div>
+                </div>
+              </label>
+              <label className="flex items-center gap-3">
+                <input type="radio" name="restoreOption" value="backend" checked={restoreOption === 'backend'} onChange={() => setRestoreOption('backend')} />
+                <div>
+                  <div className="font-medium">Restaurar solo backend/código</div>
+                  <div className="text-xs text-gray-500">Solo restaurará los archivos/código del backend, sin tocar la base de datos.</div>
+                </div>
+              </label>
+              <label className="flex items-center gap-3">
+                <input type="radio" name="restoreOption" value="db" checked={restoreOption === 'db'} onChange={() => setRestoreOption('db')} />
+                <div>
+                  <div className="font-medium">Restaurar solo base de datos</div>
+                  <div className="text-xs text-gray-500">Solo restaurará la base de datos desde el backup.</div>
+                </div>
+              </label>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={cancelRestore} className="px-4 py-2 bg-gray-200 rounded-lg">Cancelar</button>
+              <button onClick={confirmRestore} className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg">Confirmar restauración</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
