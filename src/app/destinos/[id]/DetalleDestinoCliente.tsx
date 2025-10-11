@@ -4,7 +4,7 @@ import { DetailBreadcrumbs } from "@/components/comunes/breadcrumbs";
 import { PiePagina } from "@/components/comunes/pie-pagina";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   Star,
   Heart,
@@ -23,24 +23,26 @@ import { toast } from "@/hooks/use-toast";
 
 import { Servicio } from "@/lib/servicios";
 
-export default function DetalleDestinoCliente({ destino }: { destino: Servicio }) {
+export default function DetalleDestinoCliente({
+  destino,
+}: {
+  destino: Servicio;
+}) {
   const [esFavorito, setEsFavorito] = useState(false);
   const [titulo, setTitulo] = useState("");
   const router = useRouter();
 
   useEffect(() => {
-    if (destino) {
-      setTitulo(destino.titulo);
-    }
+    if (destino) setTitulo(destino.titulo);
   }, [destino]);
 
   const manejarFavorito = () => {
     setEsFavorito(!esFavorito);
     toast({
       title: esFavorito ? "Eliminado de favoritos" : "Agregado a favoritos",
-      description: esFavorito 
-        ? `${destino?.titulo} ha sido eliminado de tus favoritos`
-        : `${destino?.titulo} ha sido agregado a tus favoritos`,
+      description: esFavorito
+        ? `${destino.titulo} ha sido eliminado de tus favoritos`
+        : `${destino.titulo} ha sido agregado a tus favoritos`,
     });
   };
 
@@ -48,15 +50,14 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
     if (navigator.share) {
       try {
         await navigator.share({
-          title: destino?.titulo,
-          text: destino?.descripcion_servicio,
+          title: destino.titulo,
+          text: destino.descripcion,
           url: window.location.href,
         });
       } catch (error) {
-        console.log('Error al compartir:', error);
+        console.log("Error al compartir:", error);
       }
     } else {
-      // Fallback: copiar URL al portapapeles
       navigator.clipboard.writeText(window.location.href);
       toast({
         title: "URL copiada",
@@ -75,13 +76,12 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
       return;
     }
 
-    // Redirigir a la página de reserva con los parámetros del destino
     const params = new URLSearchParams({
-      servicio: destino.id, // Usar 'servicio' en lugar de 'id'
+      servicio: destino.id.toString(),
       nombre: destino.titulo,
-      precio: destino.costo.toString(),
+      precio: destino.precio_usd.toString(),
     });
-    
+
     router.push(`/reserva?${params.toString()}`);
   };
 
@@ -90,9 +90,13 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50 flex items-center justify-center">
         <Card className="p-8 text-center">
           <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Destino no encontrado</h2>
-          <p className="text-gray-600 mb-4">El destino que buscas no existe o ha sido eliminado.</p>
-          <Button onClick={() => router.push('/destinos')}>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Destino no encontrado
+          </h2>
+          <p className="text-gray-600 mb-4">
+            El destino que buscas no existe o ha sido eliminado.
+          </p>
+          <Button onClick={() => router.push("/destinos")}>
             Volver a Destinos
           </Button>
         </Card>
@@ -100,20 +104,23 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
     );
   }
 
+  // ✅ Imagen corregida (usa imagen_url)
+  const imagenPrincipal = destino.imagen_url || "/placeholder.svg";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-blue-50">
-      <DetailBreadcrumbs 
-        parentPage="Destinos" 
-        parentHref="/destinos" 
-        currentPageTitle={titulo || "Detalle del Destino"} 
+      <DetailBreadcrumbs
+        parentPage="Destinos"
+        parentHref="/destinos"
+        currentPageTitle={titulo || "Detalle del Destino"}
       />
-      
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Imagen principal */}
           <div className="relative">
             <Image
-              src={destino.imagenes?.[0] || "/placeholder.svg"}
+              src={imagenPrincipal}
               alt={destino.titulo}
               width={600}
               height={400}
@@ -127,7 +134,11 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
                 onClick={manejarFavorito}
                 className="bg-white/80 hover:bg-white"
               >
-                <Heart className={`h-4 w-4 ${esFavorito ? 'fill-red-500 text-red-500' : ''}`} />
+                <Heart
+                  className={`h-4 w-4 ${
+                    esFavorito ? "fill-red-500 text-red-500" : ""
+                  }`}
+                />
               </Button>
               <Button
                 variant="secondary"
@@ -144,23 +155,28 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
           <div className="space-y-6">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <Badge variant="secondary" className="bg-blue-100 text-blue-700">
-                  {destino.categoria?.nombre || destino.tipo}
+                <Badge
+                  variant="secondary"
+                  className="bg-blue-100 text-blue-700"
+                >
+                  {destino.categoria?.nombre || "Turismo"}
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-medium">{destino.calificacion || 0}</span>
+                  <span className="font-medium">5.0</span>
                 </div>
               </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{destino.titulo}</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {destino.titulo}
+              </h1>
               <div className="flex items-center gap-2 text-gray-600">
                 <MapPin className="h-4 w-4" />
-                <span>{destino.categoria?.nombre || "Destino turístico"}</span>
+                <span>{destino.punto_encuentro}</span>
               </div>
             </div>
 
             <p className="text-gray-700 text-lg leading-relaxed">
-              {destino.descripcion_servicio}
+              {destino.descripcion}
             </p>
 
             {/* Detalles rápidos */}
@@ -169,14 +185,14 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
                 <Clock className="h-5 w-5 text-blue-600" />
                 <div>
                   <p className="text-sm text-gray-600">Duración</p>
-                  <p className="font-medium">{destino.dias} día{destino.dias > 1 ? 's' : ''}</p>
+                  <p className="font-medium">{destino.duracion}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 bg-white rounded-lg shadow-sm">
                 <Users className="h-5 w-5 text-green-600" />
                 <div>
-                  <p className="text-sm text-gray-600">Tipo</p>
-                  <p className="font-medium">{destino.tipo}</p>
+                  <p className="text-sm text-gray-600">Capacidad máxima</p>
+                  <p className="font-medium">{destino.capacidad_max} personas</p>
                 </div>
               </div>
             </div>
@@ -186,11 +202,16 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-600">Precio por persona</p>
-                  <p className="text-3xl font-bold text-blue-700">Bs. {destino.costo}</p>
+                  <p className="text-3xl font-bold text-blue-700">
+                    USD{" "}
+                    {typeof destino.precio_usd === "string"
+                      ? destino.precio_usd
+                      : destino.precio_usd.toFixed(2)}
+                  </p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
               </div>
-              <Button 
+              <Button
                 onClick={manejarReserva}
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all duration-200 transform hover:scale-105"
                 size="lg"
@@ -209,8 +230,9 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
               Qué incluye
             </h3>
             <ul className="space-y-2 text-gray-700">
-              {destino.incluido && destino.incluido.length > 0 ? (
-                destino.incluido.map((item, index) => (
+              {destino.servicios_incluidos &&
+              destino.servicios_incluidos.length > 0 ? (
+                destino.servicios_incluidos.map((item, index) => (
                   <li key={index} className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     {item}
@@ -224,10 +246,6 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
                   </li>
                   <li className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    Entradas incluidas
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
                     Transporte básico
                   </li>
                 </>
@@ -238,32 +256,19 @@ export default function DetalleDestinoCliente({ destino }: { destino: Servicio }
           <Card className="p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
               <XCircle className="h-5 w-5 text-red-600" />
-              Descripción adicional
+              Información adicional
             </h3>
             <div className="text-gray-700">
-              {destino.descripcion ? (
-                <p>{destino.descripcion}</p>
+              {destino.estado ? (
+                <p>Estado actual: {destino.estado}</p>
               ) : (
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    Alimentación no incluida
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    Gastos personales
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <XCircle className="h-4 w-4 text-red-500" />
-                    Propinas opcionales
-                  </li>
-                </ul>
+                <p>No hay información adicional disponible.</p>
               )}
             </div>
           </Card>
         </div>
       </div>
-      
+
       <PiePagina />
     </div>
   );
