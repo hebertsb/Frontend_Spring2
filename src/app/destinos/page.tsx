@@ -157,14 +157,14 @@ export default function PaginaDestinos() {
                   vistaActual === "grid" ? (
                     <TarjetaDestino
                       key={servicio.id}
-                      id={servicio.id}
-                      nombre={servicio.titulo}
-                      ubicacion={servicio.categoria?.nombre || "Sin categoría"}
-                      descripcion={servicio.descripcion_servicio}
+                      id={String(servicio.id)}
+                      nombre={servicio.titulo || ''}
+                      ubicacion={typeof servicio.categoria === 'string' ? servicio.categoria : servicio.categoria?.nombre || "Sin categoría"}
+                      descripcion={servicio.descripcion_servicio || servicio.descripcion || ''}
                       calificacion={servicio.calificacion || 0}
                       urlImagen={servicio.imagenes?.[0] || "/placeholder.svg"}
-                      precio={servicio.precio_usd.toString()}
-                      duracion={servicio.dias.toString()}
+                      precio={(servicio.precio_usd ?? 0).toString()}
+                      duracion={(servicio.dias ?? 1).toString()}
                     />
                   ) : (
                     <ItemListaDestino key={servicio.id} {...servicio} />

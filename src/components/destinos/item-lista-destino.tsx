@@ -10,7 +10,8 @@ import {Servicio} from "@/lib/servicios"
 export function ItemListaDestino({
   id,
   titulo,
-  costo,  imagenes,
+  costo,
+  imagenes,
   descripcion,
   calificacion,
   categoria,
@@ -26,7 +27,7 @@ export function ItemListaDestino({
           <div className="relative w-full h-48 overflow-hidden sm:w-80 sm:h-auto">
             <Image
               src={imagenes?.[0] || "/placeholder.svg"}
-              alt={titulo}
+              alt={titulo || 'imagen-destino'}
               fill
               className="object-cover w-full h-full"
             />

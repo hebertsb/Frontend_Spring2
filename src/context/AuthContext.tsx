@@ -35,7 +35,7 @@ const ROLE_MAP: Record<number, string> = {
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string }> ;
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   reloadUser: () => Promise<void>;
 }
@@ -118,8 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           try {
             const parsed = JSON.parse(storedUser);
             setUser(normalizeUser(parsed));
+            // We have a cached user and token — stop the global loading state.
+            setLoading(false);
           } catch {
-            // ignore
+            // If cached user is corrupted, attempt to fetch authoritative data
+            // and let reloadUser manage loading state.
+            reloadUser();
           }
         } else {
           // If no stored user, attempt to refresh authoritative user data
@@ -183,9 +187,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const handleLogout = () => {
-    apiLogout();
-    setAuthToken(null);
+  const handleLogout = async () => {
+    try {
+      await apiLogout();
+    } catch (err) {
+      // If logout call fails, we still proceed to clear local state to avoid
+      // leaving the app in a logged-in inconsistent state. Errors are logged
+      // here for debugging but do not block the UX.
+      console.error("[Auth] logout failed:", err);
+    }
+
+    // apiLogout() already clears token and cached user in localStorage via setAuthToken(null)
     setUser(null);
     router.push("/"); // Redirigir al inicio después del logout
   };

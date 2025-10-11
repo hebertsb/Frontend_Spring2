@@ -8,6 +8,7 @@ import { ChartAreaInteractive } from "./chart-area-interactive";
 
 
 import { useEffect } from 'react';
+import AdminBitacora from './admin-bitacora';
 import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser } from "@/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
@@ -322,6 +323,12 @@ const AdminDashboard = () => {
           onClick={() => setActiveTab("usuarios")}
         >
           Gestión de usuario
+        </button>
+        <button
+          className={`px-4 py-2 rounded-lg font-semibold ${activeTab === "bitacora" ? "bg-blue-600 text-white" : "bg-white text-blue-600 border border-blue-600"}`}
+          onClick={() => setActiveTab("bitacora")}
+        >
+          Bitácora
         </button>
       </div>
 
@@ -738,6 +745,22 @@ const AdminDashboard = () => {
             </div>
           )}
         </>
+      )}
+      {/* Vista Bitácora */}
+      {activeTab === "bitacora" && (
+        <div className="mt-6">
+          {/* Carga perezosa simple del componente de bitácora */}
+          <React.Suspense fallback={<div>Cargando bitácora...</div>}>
+            {/* eslint-disable-next-line @next/next/no-before-interactive */}
+            <div className="w-full">
+              <div className="max-w-full px-4">
+                <div className="bg-transparent">
+                  <AdminBitacora />
+                </div>
+              </div>
+            </div>
+          </React.Suspense>
+        </div>
       )}
     </div>
   );

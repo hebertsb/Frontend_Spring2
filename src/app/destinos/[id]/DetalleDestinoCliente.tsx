@@ -29,11 +29,12 @@ export default function DetalleDestinoCliente({
   destino: Servicio;
 }) {
   const [esFavorito, setEsFavorito] = useState(false);
-  const [titulo, setTitulo] = useState("");
+  const [titulo, setTitulo] = useState<string>("",
+  );
   const router = useRouter();
 
   useEffect(() => {
-    if (destino) setTitulo(destino.titulo);
+    if (destino && destino.titulo) setTitulo(destino.titulo);
   }, [destino]);
 
   const manejarFavorito = () => {
@@ -77,9 +78,9 @@ export default function DetalleDestinoCliente({
     }
 
     const params = new URLSearchParams({
-      servicio: destino.id.toString(),
-      nombre: destino.titulo,
-      precio: destino.precio_usd.toString(),
+      servicio: destino.id?.toString() || "",
+      nombre: destino.titulo || "",
+      precio: destino.precio_usd !== undefined ? destino.precio_usd.toString() : "0",
     });
 
     router.push(`/reserva?${params.toString()}`);
@@ -121,7 +122,7 @@ export default function DetalleDestinoCliente({
           <div className="relative">
             <Image
               src={imagenPrincipal}
-              alt={destino.titulo}
+                    alt={destino.titulo || 'imagen-destino'}
               width={600}
               height={400}
               className="w-full h-[400px] object-cover rounded-2xl shadow-lg"
@@ -159,7 +160,7 @@ export default function DetalleDestinoCliente({
                   variant="secondary"
                   className="bg-blue-100 text-blue-700"
                 >
-                  {destino.categoria?.nombre || "Turismo"}
+                  {typeof destino.categoria === 'string' ? destino.categoria : destino.categoria?.nombre || "Turismo"}
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -204,9 +205,9 @@ export default function DetalleDestinoCliente({
                   <p className="text-sm text-gray-600">Precio por persona</p>
                   <p className="text-3xl font-bold text-blue-700">
                     USD{" "}
-                    {typeof destino.precio_usd === "string"
-                      ? destino.precio_usd
-                      : destino.precio_usd.toFixed(2)}
+            {typeof destino.precio_usd === "string"
+              ? destino.precio_usd
+              : (destino.precio_usd ?? 0).toFixed(2)}
                   </p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
