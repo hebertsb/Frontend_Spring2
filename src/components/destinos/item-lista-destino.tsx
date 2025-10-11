@@ -24,13 +24,8 @@ export function ItemListaDestino({
           {/* Imagen principal */}
           <div className="relative w-full h-48 overflow-hidden sm:w-80 sm:h-auto">
             <Image
-<<<<<<< HEAD
-              src={imagenes?.[0] || "/placeholder.svg"}
-              alt={titulo || 'imagen-destino'}
-=======
               src={imagen_url || "/placeholder.svg"}
               alt={titulo}
->>>>>>> ccd9dbaa0be98fccf965db056758010d33d44e97
               fill
               className="object-cover w-full h-full"
             />

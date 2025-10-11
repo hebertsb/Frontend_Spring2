@@ -162,11 +162,7 @@ export default function DetalleDestinoCliente({
                   variant="secondary"
                   className="bg-blue-100 text-blue-700"
                 >
-<<<<<<< HEAD
-                  {typeof destino.categoria === 'string' ? destino.categoria : destino.categoria?.nombre || "Turismo"}
-=======
                   {destino.categoria.nombre ||  "Turismo"}
->>>>>>> ccd9dbaa0be98fccf965db056758010d33d44e97
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
@@ -214,14 +210,7 @@ export default function DetalleDestinoCliente({
                 <div>
                   <p className="text-sm text-gray-600">Precio por persona</p>
                   <p className="text-3xl font-bold text-blue-700">
-<<<<<<< HEAD
-                    USD{" "}
-            {typeof destino.precio_usd === "string"
-              ? destino.precio_usd
-              : (destino.precio_usd ?? 0).toFixed(2)}
-=======
                     USD {destino.precio_usd?.toString() || "0.00"}
->>>>>>> ccd9dbaa0be98fccf965db056758010d33d44e97
                   </p>
                 </div>
                 <Calendar className="h-8 w-8 text-blue-600" />
