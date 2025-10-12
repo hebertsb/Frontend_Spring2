@@ -9,7 +9,7 @@ import { ChartAreaInteractive } from "./chart-area-interactive";
 
 import { useEffect } from 'react';
 import AdminBitacora from './admin-bitacora';
-import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser } from "@/api/auth";
+import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser, listRoles } from "@/api/auth";
 import { listarBackups, crearBackup, restaurarBackup, descargarBackup, eliminarBackup } from '@/api/backups_restore';
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
@@ -73,10 +73,24 @@ const normalizeApiUser = (raw: any): User => {
     if (ex.slug) rolesSlugs.push(ex.slug);
   }
 
-  //Estado normalization
-  let estado = raw.estado ?? raw.status ?? "";
-  if (estado === true) estado = 'activo';
-  if (estado === false) estado = 'inactivo';
+  // Estado normalization: accept multiple possible field names and formats
+  let estado: any = raw.estado ?? raw.status ?? (raw.is_active !== undefined ? raw.is_active : undefined) ?? raw.active ?? raw.enabled ?? raw.habilitado ?? "";
+  // Normalize boolean-like values
+  if (estado === true || estado === 1) estado = 'activo';
+  else if (estado === false || estado === 0) estado = 'inactivo';
+  else {
+    const s = String(estado || '').toLowerCase();
+    if (s === 'true' || s === 'activo' || s === 'active' || s === 'enabled' || s === '1') estado = 'activo';
+    else if (s === 'false' || s === 'inactivo' || s === 'inactive' || s === 'disabled' || s === '0') estado = 'inactivo';
+    else estado = '';
+  }
+
+  // Capture an explicit boolean when available so UI can make correct decisions
+  // rawActiveVal can be boolean or numeric flag from different API shapes
+  const rawActiveVal = raw.is_active ?? raw.active ?? raw.enabled ?? raw.habilitado;
+  let isActiveMaybe: boolean | null = null;
+  if (rawActiveVal === true || rawActiveVal === 1) isActiveMaybe = true;
+  else if (rawActiveVal === false || rawActiveVal === 0) isActiveMaybe = false;
 
     const roleStrFromSlug = (rolesSlugs && rolesSlugs.length > 0) ? String(rolesSlugs[0]).toLowerCase() : undefined;
     const roleStrFromId = roles.length > 0 ? String(ROLE_MAP[roles[0]] || roles[0]).toLowerCase() : undefined;
@@ -91,7 +105,9 @@ const normalizeApiUser = (raw: any): User => {
       role: finalRoleStr,
       roles,
       rolesSlugs,
-      estado: String(estado || "").toLowerCase(),
+  estado: String(estado || "").toLowerCase(),
+  // explicit boolean hint (true/false) when backend provides it, otherwise null
+  isActiveMaybe,
       location: raw.location || raw.ciudad || raw.city || undefined,
       registrationDate: raw.created_at || raw.date_joined || raw.registered_at || undefined,
       telefono: raw.telefono || raw.phone || undefined,
@@ -121,7 +137,8 @@ interface User {
   pais?: string;
 }
 
-const roles = ["administrador", "cliente", "proveedor", "soporte"];
+// Fallback static roles (used only if the backend roles endpoint is unavailable)
+const FALLBACK_ROLES = ["administrador", "cliente", "proveedor", "soporte"];
 
 
 const AdminDashboard = () => {
@@ -149,6 +166,11 @@ const AdminDashboard = () => {
     pais: "",
     email: ""
   });
+
+  // Available roles pulled from backend (slug/name/id). If empty, fall back to FALLBACK_ROLES
+  const [availableRoles, setAvailableRoles] = useState<Array<{ id?: number; slug: string; name?: string }>>([]);
+  // Loading state per-user for actions like disable/reactivate to show spinners and avoid duplicate clicks
+  const [userActionLoading, setUserActionLoading] = useState<Record<string, boolean>>({});
 
   // Determinar el tipo de panel según el rol del usuario
   const getPanelTitle = () => {
@@ -198,6 +220,28 @@ const AdminDashboard = () => {
     })();
   }, [currentUser]);
 
+  // Fetch roles from backend if user is admin (non-blocking)
+  useEffect(() => {
+    (async () => {
+      try {
+        const roleRes = await listRoles();
+        const data = roleRes?.data;
+        // Normalize expected shapes: array of roles, or { results: [...] }
+        let list: any[] = [];
+        if (Array.isArray(data)) list = data;
+        else if (data && Array.isArray(data.results)) list = data.results;
+        else if (data && typeof data === 'object') {
+          // Some backends return objects indexed by id
+          list = Object.values(data);
+        }
+        const normalized = list.map(r => ({ id: r.id, slug: String(r.slug || r.name || r.nombre || r.label || r.id).toLowerCase(), name: r.name || r.nombre || r.label }));
+        if (normalized.length > 0) setAvailableRoles(normalized);
+      } catch (err) {
+        // ignore - we'll use fallback static roles
+      }
+    })();
+  }, [currentUser]);
+
   const filteredUsers = users.filter(user => {
     const nombres = user.nombres || "";
     const apellidos = user.apellidos || "";
@@ -209,11 +253,11 @@ const AdminDashboard = () => {
     
     // Filtro por rol - corregido para trabajar con nombres de roles
     let matchesRole = true;
-    if (filterRole !== "todos") {
+  if (filterRole !== "todos") {
       // Consider both role IDs and role slugs when filtering
       const userRoleNamesFromIds = (user.roles || []).map(roleId => ROLE_MAP[roleId]).filter(Boolean);
       const userRoleSlugs = (user.rolesSlugs || []);
-      const userAllRoleStrings = [...userRoleNamesFromIds.map(s => String(s)), ...userRoleSlugs.map(s => String(s))].map(s => s.toLowerCase());
+      const userAllRoleStrings = [...userRoleNamesFromIds.map(s => String(s)), ...userRoleSlugs.map(s => String(s)), ...(user.role ? [user.role] : [])].map(s => s.toLowerCase());
       matchesRole = userAllRoleStrings.includes(String(filterRole).toLowerCase());
     }
     
@@ -223,71 +267,84 @@ const AdminDashboard = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  // Helper to determine if a user is active. Accepts multiple possible fields/formats.
+  const isUserActive = (u: any) => {
+    if (!u) return false;
+    // If the normalized user contains an explicit boolean hint, prefer that
+    if (typeof u.isActiveMaybe === 'boolean') return !!u.isActiveMaybe;
+    const raw = u.estado ?? u.is_active ?? u.active ?? u.enabled ?? u.habilitado ?? '';
+    const s = String(raw || '').toLowerCase();
+    // If estado is not provided, assume active by default to allow disabling from UI
+    if (!s) return true;
+    return s === 'activo' || s === 'true' || s === '1' || s === 'active' || s === 'enabled';
+  };
+
+  const isUserInactive = (u: any) => {
+    if (!u) return false;
+    if (typeof u.isActiveMaybe === 'boolean') return !u.isActiveMaybe;
+    const raw = u.estado ?? u.is_active ?? u.active ?? u.enabled ?? u.habilitado ?? '';
+    const s = String(raw || '').toLowerCase();
+    return s === 'inactivo' || s === 'inactive' || s === 'disabled' || s === 'false' || s === '0';
+  };
+
   // Deshabilitar usuario
   const handleDisableUser = async (userId: string) => {
+    // optimistic UI: set user to inactive immediately and show spinner for that user
+    setUserActionLoading(prev => ({ ...prev, [userId]: true }));
+    const prevUsers = users;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, estado: 'inactivo' } : u));
     try {
       await disableUser(userId);
-      const res = await listUsers();
-      const arr = res?.data || [];
-      setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
-      toast({
-        title: "Usuario deshabilitado",
-        description: "El usuario ha sido deshabilitado correctamente.",
-        duration: 3500,
-      });
-    } catch {
-      toast({
-        title: "Error al deshabilitar usuario",
-        description: "No se pudo deshabilitar el usuario. Intenta nuevamente.",
-        variant: "destructive",
-        duration: 3500,
-      });
+      // don't overwrite optimistic change with a server list that may omit the field;
+      // update only the affected user to keep UI consistent
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, estado: 'inactivo', isActiveMaybe: false } : u));
+      toast({ title: "Usuario deshabilitado", description: "El usuario ha sido deshabilitado correctamente.", duration: 3500 });
+    } catch (err) {
+      // revert optimistic update
+      setUsers(prevUsers);
+      toast({ title: "Error al deshabilitar usuario", description: "No se pudo deshabilitar el usuario. Intenta nuevamente.", variant: "destructive", duration: 3500 });
+    } finally {
+      setUserActionLoading(prev => ({ ...prev, [userId]: false }));
     }
   };
 
   // Reactivar usuario
   const handleReactivateUser = async (userId: string) => {
+    setUserActionLoading(prev => ({ ...prev, [userId]: true }));
+    const prevUsers = users;
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, estado: 'activo' } : u));
     try {
       await reactivateUser(userId);
-      const res = await listUsers();
-      const arr = res?.data || [];
-      setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
-      toast({
-        title: "Usuario reactivado",
-        description: "El usuario ha sido reactivado correctamente.",
-        duration: 3500,
-      });
-    } catch {
-      toast({
-        title: "Error al reactivar usuario",
-        description: "No se pudo reactivar el usuario. Intenta nuevamente.",
-        variant: "destructive",
-        duration: 3500,
-      });
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, estado: 'activo', isActiveMaybe: true } : u));
+      toast({ title: "Usuario reactivado", description: "El usuario ha sido reactivado correctamente.", duration: 3500 });
+    } catch (err) {
+      setUsers(prevUsers);
+      toast({ title: "Error al reactivar usuario", description: "No se pudo reactivar el usuario. Intenta nuevamente.", variant: "destructive", duration: 3500 });
+    } finally {
+      setUserActionLoading(prev => ({ ...prev, [userId]: false }));
     }
   };
 
   // Asignar rol a usuario
-  const handleAssignRole = async (roleId: number) => {
+  const handleAssignRole = async (roleSlugOrId: string | number) => {
     if (!selectedUser) return;
     try {
-      // Convertir el ID del rol a nombre del rol
-      const roleName = ROLE_MAP[roleId];
-      if (!roleName) {
-        throw new Error("Rol no válido");
+      // Determine slug to send to backend (prefer slug when present)
+      let roleSlug: string | undefined;
+      if (typeof roleSlugOrId === 'number') {
+        roleSlug = ROLE_MAP[roleSlugOrId];
+      } else {
+        roleSlug = String(roleSlugOrId).toLowerCase();
       }
-      await assignRole(selectedUser.id, roleName);
+      if (!roleSlug) throw new Error('Rol no válido');
+      await assignRole(selectedUser.id, roleSlug);
       setSelectedUser(null);
       setShowRoleModal(false);
       // Actualizar lista de usuarios
       const res = await listUsers();
       const arr = res?.data || [];
       setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
-      toast({
-        title: "Rol asignado",
-        description: `El rol ${roleName} ha sido asignado a ${selectedUser.nombres || selectedUser.name || 'el usuario'}.`,
-        duration: 3500,
-      });
+      toast({ title: "Rol asignado", description: `El rol ${roleSlugOrId} ha sido asignado a ${selectedUser.nombres || selectedUser.name || 'el usuario'}.`, duration: 3500 });
     } catch {
       setError("No se pudo asignar el rol");
       toast({
@@ -735,9 +792,15 @@ const AdminDashboard = () => {
                   onChange={e => setFilterRole(e.target.value)}
                 >
                   <option value="todos">Todos los roles</option>
-                  {roles.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
+                  {availableRoles && availableRoles.length > 0 ? (
+                    availableRoles.map(r => (
+                      <option key={r.slug} value={r.slug}>{r.name || r.slug}</option>
+                    ))
+                  ) : (
+                    FALLBACK_ROLES.map(role => (
+                      <option key={role} value={role}>{role}</option>
+                    ))
+                  )}
                 </select>
                 <select
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
@@ -935,15 +998,38 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
-                        {String(user.estado || "").toLowerCase() === "activo" ? (
-                          <button title="Deshabilitar usuario" className="text-red-600 hover:text-red-900" onClick={() => handleDisableUser(user.id)}>
-                            <Trash2 className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button title="Reactivar usuario" className="text-green-600 hover:text-green-900" onClick={() => handleReactivateUser(user.id)}>
+                        {/* Show only the action relevant to the user's current state */}
+                        {isUserActive(user) && (
+                          <button
+                            title="Deshabilitar usuario"
+                            onClick={() => handleDisableUser(user.id)}
+                            disabled={!!userActionLoading[user.id]}
+                            aria-label="Deshabilitar usuario"
+                            className={`mx-1 p-1 rounded ${!userActionLoading[user.id] ? 'text-red-600 hover:text-red-900' : 'text-gray-400 opacity-60 cursor-not-allowed'}`}
+                          >
+                            {userActionLoading[user.id] ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+
+                        {isUserInactive(user) && (
+                          <button
+                            title="Reactivar usuario"
+                            onClick={() => handleReactivateUser(user.id)}
+                            disabled={!!userActionLoading[user.id]}
+                            aria-label="Reactivar usuario"
+                            className={`mx-1 p-1 rounded ${!userActionLoading[user.id] ? 'text-green-600 hover:text-green-900' : 'text-gray-400 opacity-60 cursor-not-allowed'}`}
+                          >
+                            {userActionLoading[user.id] ? (
+                              <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            ) : (
                               <UserPlus className="w-4 h-4" />
-                            </button>
-                          )}
+                            )}
+                          </button>
+                        )}
                           <button title="Asignar rol" className="text-green-600 hover:text-green-900" onClick={() => handleOpenRoleModal(user)}>
                             <Shield className="w-4 h-4" />
                           </button>
@@ -971,18 +1057,33 @@ const AdminDashboard = () => {
               <div className="bg-white rounded-lg p-6 w-full max-w-xs mx-4">
                 <h3 className="text-lg font-medium text-gray-900 mb-4">Asignar rol a {selectedUser.name}</h3>
                 <div className="flex flex-col gap-2 mb-4">
-                  {Object.entries(ROLE_MAP).map(([id, name]) => (
-                    <button
-                      key={id}
-                      className="px-3 py-2 rounded-lg border border-blue-300 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-900 font-bold shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
-                      onClick={() => handleAssignRole(Number(id))}
-                    >
-                      <span className="inline-block align-middle mr-2">
-                        <Shield className="w-4 h-4 inline text-blue-500" />
-                      </span>
-                      {name}
-                    </button>
-                  ))}
+                  {availableRoles && availableRoles.length > 0 ? (
+                    availableRoles.map(r => (
+                      <button
+                        key={r.slug}
+                        className="px-3 py-2 rounded-lg border border-blue-300 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-900 font-bold shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                        onClick={() => handleAssignRole(r.slug)}
+                      >
+                        <span className="inline-block align-middle mr-2">
+                          <Shield className="w-4 h-4 inline text-blue-500" />
+                        </span>
+                        {r.name || r.slug}
+                      </button>
+                    ))
+                  ) : (
+                    Object.entries(ROLE_MAP).map(([id, name]) => (
+                      <button
+                        key={id}
+                        className="px-3 py-2 rounded-lg border border-blue-300 bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-900 font-bold shadow-sm transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                        onClick={() => handleAssignRole(Number(id))}
+                      >
+                        <span className="inline-block align-middle mr-2">
+                          <Shield className="w-4 h-4 inline text-blue-500" />
+                        </span>
+                        {name}
+                      </button>
+                    ))
+                  )}
                 </div>
                 <button
                   className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"

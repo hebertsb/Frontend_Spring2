@@ -1,12 +1,32 @@
 import api, { setAuthToken } from "./axios";
 
 // Reactivar usuario (eliminación lógica inversa)
+// Reactivar usuario: try canonical PATCH /users/{id}/active/ with { is_active: true }
 export const reactivateUser = async (id: string) => {
-  return api.post(`/usuarios/${id}/reactivar/`);
+  try {
+    return await api.patch(`/users/${id}/active/`, { is_active: true });
+  } catch (err: any) {
+    // fallback to legacy endpoint
+    try {
+      return await api.post(`/usuarios/${id}/reactivar/`);
+    } catch (fallbackErr) {
+      throw fallbackErr;
+    }
+  }
 };
-// Deshabilitar usuario (eliminación lógica)
+
+// Deshabilitar usuario (actualiza is_active=false). Try canonical PATCH first, fallback to legacy.
 export const disableUser = async (id: string) => {
-  return api.post(`/usuarios/${id}/inhabilitar/`);
+  try {
+    return await api.patch(`/users/${id}/active/`, { is_active: false });
+  } catch (err: any) {
+    // fallback to legacy endpoint
+    try {
+      return await api.post(`/usuarios/${id}/inhabilitar/`);
+    } catch (fallbackErr) {
+      throw fallbackErr;
+    }
+  }
 };
 // Editar datos de usuario por ID (admin)
 export interface EditUserData {
