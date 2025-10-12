@@ -24,15 +24,24 @@ export const editUser = async (id: string, data: EditUserData) => {
 };
 export const login = async (email: string, password: string) => {
   try {
-    const response = await api.post("/login/", { email, password });
-    const token = response.data?.token || null;
-    const user = response.data?.user || null;
+  const response = await api.post("/login/", { email, password });
+  const token = response.data?.token || null;
+  // backend may return `user` or `usuario` (spanish key) depending on implementation
+  const user = response.data?.user || response.data?.usuario || null;
     if (token) setAuthToken(token);
     if (typeof window !== "undefined" && user) localStorage.setItem("user", JSON.stringify(user));
     return response.data;
   } catch (error: any) {
-    // Re-throw normalized error for caller
-    throw error;
+    // Log detailed backend validation error for easier debugging and rethrow
+    const status = error?.response?.status;
+    const data = error?.response?.data;
+    console.error("[auth.login] request failed:", { status, data });
+    // Throw a clearer error object so UI can show message if desired
+    const message = data?.detail || data?.message || JSON.stringify(data) || error.message || "Login failed";
+    const err = new Error(`Login failed (status=${status}): ${message}`);
+    // Attach original response for advanced handling
+    (err as any).response = error?.response;
+    throw err;
   }
 };
 
@@ -53,7 +62,8 @@ export const register = async (data: {
   // Ensure required fields for this backend (nombre, rubro, rol) are present at call site
   const res = await api.post("/register/", data);
   const token = res.data?.token || null;
-  const user = res.data?.user || null;
+  // support both `user` and `usuario` keys from backend
+  const user = res.data?.user || res.data?.usuario || null;
   if (token) setAuthToken(token);
   if (typeof window !== "undefined" && user) localStorage.setItem("user", JSON.stringify(user));
   return res.data;
@@ -165,11 +175,97 @@ export const restablecerPassword = async (token: string, password: string, email
 };
 
 export const listUsers = async () => {
-  return api.get("/usuarios/");
+  // Try the canonical English endpoint first (per backend guide), then
+  // fallback to the existing Spanish endpoint. Normalize responses so
+  // callers that expect `res.data` to be an array keep working.
+  try {
+    const res = await api.get("/users/");
+    const data = res.data;
+    if (Array.isArray(data)) return { data } as any;
+    if (data && Array.isArray(data.results)) return { data: data.results, meta: { count: data.count, next: data.next, previous: data.previous } } as any;
+    // Unexpected shape: wrap in array
+    return { data: Array.isArray(data) ? data : [data] } as any;
+  } catch (err) {
+    // Log the original error for debugging before falling back
+    try {
+      const e = err as any;
+      console.error('[api.listUsers] /users/ failed:', e?.response?.status, e?.response?.data);
+    } catch {}
+
+    // Fallback to Spanish endpoint used historically in this repo
+    let res;
+    try {
+      res = await api.get("/usuarios/");
+    } catch (fallbackErr) {
+      // Log fallback error too and rethrow so caller can see details
+      try {
+        const fe = fallbackErr as any;
+        console.error('[api.listUsers] /usuarios/ also failed:', fe?.response?.status, fe?.response?.data);
+      } catch {}
+      throw fallbackErr;
+    }
+    const data = res.data;
+    if (Array.isArray(data)) return { data } as any;
+    if (data && Array.isArray(data.results)) return { data: data.results, meta: { count: data.count, next: data.next, previous: data.previous } } as any;
+    return { data: Array.isArray(data) ? data : [data] } as any;
+  }
 };
 
+// Assign a single role to a user. Try the backend-guide preferred endpoint
+// (`/users/{id}/roles/` with body { role }) first, then fall back to the
+// legacy Spanish endpoint `/usuarios/{id}/asignar-rol/` (body { rol }).
 export const assignRole = async (id: string, rol: string) => {
-  return api.post(`/usuarios/${id}/asignar-rol/`, { rol });
+  try {
+    // preferred contract: POST /api/users/{id}/roles/ { role: 'editor' }
+    return await api.post(`/users/${id}/roles/`, { role: rol });
+    } catch (err: any) {
+    // Log the error to help debugging why the preferred endpoint failed
+    try {
+      const e = err as any;
+      console.error('[api.assignRole] POST /users/{id}/roles/ failed:', e?.response?.status, e?.response?.data);
+    } catch {}
+    // fallback to historical endpoint
+    try {
+      return await api.post(`/usuarios/${id}/asignar-rol/`, { rol });
+    } catch (fallbackErr: any) {
+      try {
+        const fe = fallbackErr as any;
+        console.error('[api.assignRole] fallback /usuarios/{id}/asignar-rol/ failed:', fe?.response?.status, fe?.response?.data);
+      } catch {}
+      throw fallbackErr;
+    }
+  }
+};
+
+// Patch user roles using the recommended delta shape { add: [], remove: [] }
+export const patchUserRoles = async (id: string, delta: { add?: string[]; remove?: string[] } ) => {
+  try {
+    return await api.patch(`/users/${id}/roles/`, delta);
+  } catch (err: any) {
+    // If backend only provides a Spanish-style endpoint, try that as a last resort
+    // (no exact equivalent exists historically; implementers can add one server-side)
+    throw err;
+  }
+};
+
+// Delete a role from a user: DELETE /users/{id}/roles/{role_slug_or_id}/
+export const deleteUserRole = async (id: string, roleSlugOrId: string | number) => {
+  try {
+    return await api.delete(`/users/${id}/roles/${roleSlugOrId}/`);
+  } catch (err: any) {
+    // fallback: if backend exposes a different delete path, update here
+    throw err;
+  }
+};
+
+// List available roles
+export const listRoles = async () => {
+  try {
+    return await api.get(`/roles/`);
+  } catch (err: any) {
+    // no Spanish equivalent expected; bubble up error
+    throw err;
+  }
 };
 
 export const updateProfile = async (data: UpdateUserData) => {

@@ -14,13 +14,92 @@ import { listarBackups, crearBackup, restaurarBackup, descargarBackup, eliminarB
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 
-// Mapeo de IDs de roles a nombres (según contrato del backend)
+// Mapeo de IDs de roles a slugs (según contrato del backend)
 // Backend: 1=Administrador, 2=Cliente, 3=Proveedor, 4=Soporte
 const ROLE_MAP: Record<number, string> = {
   1: "administrador",
   2: "cliente",
   3: "proveedor",
   4: "soporte"
+};
+// Inverse map: slug -> id
+const SLUG_TO_ID: Record<string, number> = Object.entries(ROLE_MAP).reduce((acc, [id, slug]) => {
+  acc[String(slug)] = Number(id);
+  return acc;
+}, {} as Record<string, number>);
+
+// Normalize a raw user object from backend into the local `User` shape
+const normalizeApiUser = (raw: any): User => {
+  const id = String(raw.id ?? raw.pk ?? raw.user_id ?? raw.uuid ?? "");
+  const email = raw.email || raw.username || raw.usuario || "";
+  const nombres = raw.nombres || raw.first_name || raw.nombre || raw.full_name || "";
+  const apellidos = raw.apellidos || raw.last_name || raw.apellidos || "";
+  const name = `${(nombres || raw.name || raw.full_name || "").trim()} ${(apellidos || "").trim()}`.trim() || (raw.name || raw.full_name || raw.username || "");
+
+  // roles may come as [1,2] or [{id:1,slug:'admin'}] or ['administrador']
+  let roles: number[] = [];
+  let rolesSlugs: string[] = [];
+  const extractRole = (r: any) => {
+    if (typeof r === 'number') return { id: r, slug: ROLE_MAP[r] };
+    if (typeof r === 'string') return { id: SLUG_TO_ID[r] ?? null, slug: r };
+    if (r && typeof r === 'object') {
+      if (typeof r.id === 'number') return { id: r.id, slug: r.slug ?? ROLE_MAP[r.id] };
+      if (typeof r.slug === 'string') return { id: SLUG_TO_ID[r.slug] ?? null, slug: r.slug };
+    }
+    return { id: null, slug: null };
+  };
+
+  if (Array.isArray(raw.roles)) {
+    for (const r of raw.roles) {
+      const ex = extractRole(r);
+      if (ex.id) roles.push(ex.id);
+      if (ex.slug) rolesSlugs.push(ex.slug);
+    }
+  } else if (Array.isArray(raw.role) && raw.role.length > 0) {
+    for (const r of raw.role) {
+      const ex = extractRole(r);
+      if (ex.id) roles.push(ex.id);
+      if (ex.slug) rolesSlugs.push(ex.slug);
+    }
+  } else if (typeof raw.rol === 'object' && raw.rol?.id) {
+    roles = [Number(raw.rol.id)];
+    if (raw.rol?.slug) rolesSlugs = [raw.rol.slug];
+  } else if (typeof raw.rol === 'number') {
+    roles = [raw.rol];
+  } else if (typeof raw.roles === 'string') {
+    // single slug string
+    const ex = extractRole(raw.roles);
+    if (ex.id) roles.push(ex.id);
+    if (ex.slug) rolesSlugs.push(ex.slug);
+  }
+
+  //Estado normalization
+  let estado = raw.estado ?? raw.status ?? "";
+  if (estado === true) estado = 'activo';
+  if (estado === false) estado = 'inactivo';
+
+    const roleStrFromSlug = (rolesSlugs && rolesSlugs.length > 0) ? String(rolesSlugs[0]).toLowerCase() : undefined;
+    const roleStrFromId = roles.length > 0 ? String(ROLE_MAP[roles[0]] || roles[0]).toLowerCase() : undefined;
+    const finalRoleStr = roleStrFromSlug || roleStrFromId || String(raw.role || raw.rol || "").toLowerCase();
+
+    return {
+      id,
+      name,
+      nombres,
+      apellidos,
+      email,
+      role: finalRoleStr,
+      roles,
+      rolesSlugs,
+      estado: String(estado || "").toLowerCase(),
+      location: raw.location || raw.ciudad || raw.city || undefined,
+      registrationDate: raw.created_at || raw.date_joined || raw.registered_at || undefined,
+      telefono: raw.telefono || raw.phone || undefined,
+      fecha_nacimiento: raw.fecha_nacimiento || raw.birth_date || null,
+      genero: raw.genero || raw.gender || undefined,
+      documento_identidad: raw.documento_identidad || raw.document_number || null,
+      pais: raw.pais || raw.country || undefined,
+    } as User;
 };
 
 interface User {
@@ -31,6 +110,7 @@ interface User {
   email: string;
   role?: string; // principal (opcional)
   roles?: number[]; // array de ids de roles
+  rolesSlugs?: string[]; // array de slugs cuando backend devuelve slugs
   estado: string;
   location?: string;
   registrationDate?: string;
@@ -93,11 +173,30 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     setLoading(true);
-    listUsers()
-      .then(res => setUsers(res.data))
-      .catch(() => setError("No se pudieron cargar los usuarios"))
-      .finally(() => setLoading(false));
-  }, []);
+    (async () => {
+      try {
+        // Only attempt to load users if currentUser appears to have admin/change_user privileges
+        const roleStr = String(currentUser?.role || "").toLowerCase();
+        const isAdmin = !!(currentUser?.roles?.includes(1) || roleStr === "administrador");
+        if (!currentUser || !isAdmin) {
+          setError("No tienes permisos para ver la gestión de usuarios.");
+          setUsers([]);
+          setLoading(false);
+          return;
+        }
+
+        const res = await listUsers();
+        // listUsers returns { data: [...], meta?: {count,...} } or { data: results }
+        const arr = res?.data || [];
+        const mapped = Array.isArray(arr) ? arr.map(normalizeApiUser) : [];
+        setUsers(mapped);
+      } catch (e) {
+        setError("No se pudieron cargar los usuarios");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [currentUser]);
 
   const filteredUsers = users.filter(user => {
     const nombres = user.nombres || "";
@@ -105,15 +204,17 @@ const AdminDashboard = () => {
     const nombreCompleto = `${nombres} ${apellidos}`.trim();
     
     // Filtro de búsqueda por nombre o email
-    const matchesSearch = nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+  const matchesSearch = nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) || 
+             (String(user.email || "").toLowerCase().includes(searchTerm.toLowerCase()));
     
     // Filtro por rol - corregido para trabajar con nombres de roles
     let matchesRole = true;
     if (filterRole !== "todos") {
-      // Convertir los IDs de roles del usuario a nombres y verificar si incluye el rol seleccionado
-      const userRoleNames = (user.roles || []).map(roleId => ROLE_MAP[roleId]).filter(Boolean);
-      matchesRole = userRoleNames.includes(filterRole);
+      // Consider both role IDs and role slugs when filtering
+      const userRoleNamesFromIds = (user.roles || []).map(roleId => ROLE_MAP[roleId]).filter(Boolean);
+      const userRoleSlugs = (user.rolesSlugs || []);
+      const userAllRoleStrings = [...userRoleNamesFromIds.map(s => String(s)), ...userRoleSlugs.map(s => String(s))].map(s => s.toLowerCase());
+      matchesRole = userAllRoleStrings.includes(String(filterRole).toLowerCase());
     }
     
     // Filtro por estado
@@ -127,7 +228,8 @@ const AdminDashboard = () => {
     try {
       await disableUser(userId);
       const res = await listUsers();
-      setUsers(res.data);
+      const arr = res?.data || [];
+      setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
       toast({
         title: "Usuario deshabilitado",
         description: "El usuario ha sido deshabilitado correctamente.",
@@ -148,7 +250,8 @@ const AdminDashboard = () => {
     try {
       await reactivateUser(userId);
       const res = await listUsers();
-      setUsers(res.data);
+      const arr = res?.data || [];
+      setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
       toast({
         title: "Usuario reactivado",
         description: "El usuario ha sido reactivado correctamente.",
@@ -178,7 +281,8 @@ const AdminDashboard = () => {
       setShowRoleModal(false);
       // Actualizar lista de usuarios
       const res = await listUsers();
-      setUsers(res.data);
+      const arr = res?.data || [];
+      setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
       toast({
         title: "Rol asignado",
         description: `El rol ${roleName} ha sido asignado a ${selectedUser.nombres || selectedUser.name || 'el usuario'}.`,
@@ -274,11 +378,12 @@ const AdminDashboard = () => {
         pais: "",
         email: ""
       });
-      // Refrescar usuarios
-      setLoading(true);
-      const res = await listUsers();
-      setUsers(res.data);
-      setLoading(false);
+  // Refrescar usuarios
+  setLoading(true);
+  const res = await listUsers();
+  const arr = res?.data || [];
+  setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
+  setLoading(false);
       setError(null);
       toast({
         title: "✅ ¡Usuario modificado con éxito!",
@@ -479,7 +584,7 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-purple-100 text-sm font-medium">Operadores</p>
-                  <p className="text-3xl font-bold">{users.filter(u => u.roles?.includes(2)).length}</p>
+                  <p className="text-3xl font-bold">{users.filter(u => (u.roles || []).includes(3) || (u.rolesSlugs || []).includes('proveedor')).length}</p>
                 </div>
                 <UserPlus className="w-10 h-10 text-purple-200" />
               </div>
@@ -489,7 +594,7 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-yellow-100 text-sm font-medium">Clientes</p>
-                  <p className="text-3xl font-bold">{users.filter(u => u.roles?.includes(3)).length}</p>
+                  <p className="text-3xl font-bold">{users.filter(u => (u.roles || []).includes(2) || (u.rolesSlugs || []).includes('cliente')).length}</p>
                 </div>
                 <Star className="w-10 h-10 text-yellow-200" />
               </div>
@@ -554,7 +659,8 @@ const AdminDashboard = () => {
                 <h4 className="font-medium text-gray-700 mb-3">Distribución de Roles</h4>
                 <div className="space-y-3">
                   {Object.entries(ROLE_MAP).map(([id, name]) => {
-                    const count = users.filter(u => u.roles?.includes(Number(id))).length;
+                    // Count users that either have the role id or the role slug
+                    const count = users.filter(u => (u.roles || []).includes(Number(id)) || (u.rolesSlugs || []).includes(String(name))).length;
                     const percentage = users.length > 0 ? (count / users.length * 100).toFixed(1) : 0;
                     return (
                       <div key={id} className="flex items-center justify-between">
@@ -669,15 +775,39 @@ const AdminDashboard = () => {
                     </td>
                     <td className="px-1 md:px-4 py-1 md:py-2 whitespace-normal text-[11px] md:text-sm">
                       <div className="flex flex-wrap gap-1">
-                        {(user.roles || []).map((roleId) => (
-                          <span
-                            key={roleId}
-                            className="px-2 py-0.5 bg-gray-200 rounded text-[10px] md:text-xs font-semibold break-words whitespace-normal cursor-help leading-tight"
-                            title={ROLE_MAP[roleId] || String(roleId)}
-                          >
-                            {ROLE_MAP[roleId] || roleId}
-                          </span>
-                        ))}
+                        {/* Render role badges from ids or slugs */}
+                        {(() => {
+                          // Build a unique set of role label strings from ids and slugs
+                          const labels = new Set<string>();
+                          // From numeric ids
+                          for (const rid of (user.roles || [])) {
+                            const label = ROLE_MAP[rid] ?? String(rid);
+                            if (label) labels.add(String(label));
+                          }
+                          // From slugs
+                          for (const s of (user.rolesSlugs || [])) {
+                            if (s) labels.add(String(s));
+                          }
+                          // Render each unique label once, capitalized and colored by role
+                          return Array.from(labels).map((lbl) => {
+                            const s = String(lbl || '').toLowerCase();
+                            const label = s.charAt(0).toUpperCase() + s.slice(1);
+                            // color by slug
+                            const colorClass = s === 'administrador' ? 'bg-red-100 text-red-800' :
+                                               s === 'proveedor' ? 'bg-purple-100 text-purple-800' :
+                                               s === 'cliente' ? 'bg-yellow-100 text-yellow-800' :
+                                               s === 'soporte' ? 'bg-indigo-100 text-indigo-800' : 'bg-gray-200 text-gray-800';
+                            return (
+                              <span
+                                key={lbl}
+                                className={`px-2 py-0.5 ${colorClass} rounded text-[10px] md:text-xs font-semibold break-words whitespace-normal cursor-help leading-tight`}
+                                title={lbl}
+                              >
+                                {label}
+                              </span>
+                            );
+                          });
+                        })()}
                       </div>
                     </td>
                     <td className="px-2 md:px-4 py-2 whitespace-normal">
@@ -689,9 +819,9 @@ const AdminDashboard = () => {
                         else if (estado === "bloqueado") color = "bg-red-100 text-red-800";
                         return (
                           <span className={`inline-flex px-2 py-1 text-[10px] md:text-xs font-semibold rounded-full ${color}`}>
-                            {estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : ""}
-                            </span>
-                          );
+                            {estado ? estado.charAt(0).toUpperCase() + estado.slice(1) : '—'}
+                          </span>
+                        );
             })()}
           </td>
           <td className="px-2 md:px-4 py-2 whitespace-nowrap text-xs md:text-sm font-medium">
@@ -805,7 +935,7 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
-                        {user.estado === "ACTIVO" ? (
+                        {String(user.estado || "").toLowerCase() === "activo" ? (
                           <button title="Deshabilitar usuario" className="text-red-600 hover:text-red-900" onClick={() => handleDisableUser(user.id)}>
                             <Trash2 className="w-4 h-4" />
                             </button>

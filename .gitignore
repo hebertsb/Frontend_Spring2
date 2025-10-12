@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Ignore all .txt files
 *.txt
+
+# Ignore markdown files
+*.md

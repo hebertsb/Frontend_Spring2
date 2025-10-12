@@ -14,6 +14,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const router = useRouter();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loadingForm, setLoadingForm] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [redirectPending, setRedirectPending] = useState(false);
   const reactId = useId();
   const emailId = `login-email-${reactId}`;
@@ -30,6 +31,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     const safeValue = value || ""; // Ensure value is always a string
+    // Clear any server error when user types
+    setErrorMessage(null);
     if (id === emailId) setForm(f => ({ ...f, email: safeValue }));
     else if (id === passwordId) setForm(f => ({ ...f, password: safeValue }));
   };
@@ -46,6 +49,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         await reloadUser();
         setRedirectPending(true);
       } else {
+        // Show message returned from AuthContext
+        setErrorMessage(res.message || "Credenciales inválidas");
         // Asegurar que no hay redirección pendiente en caso de error
         setRedirectPending(false);
         
@@ -60,6 +65,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
     } catch (error) {
       // Asegurar que no hay redirección pendiente en caso de error
       setRedirectPending(false);
+      // Mostrar mensaje de error detallado si está disponible
+      if (error instanceof Error) setErrorMessage(error.message);
+      else setErrorMessage("Error al iniciar sesión");
     }
     
     setLoadingForm(false);
@@ -74,6 +82,12 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         </p>
       </div>
       <div className="grid gap-6">
+        {errorMessage && (
+          <div className="p-3 bg-red-50 border border-red-100 text-red-800 rounded-md flex items-start gap-3">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="text-sm">{errorMessage}</div>
+          </div>
+        )}
         <div className="grid gap-3">
               <Label htmlFor={emailId}>Email</Label>
               <Input id={emailId} type="email" placeholder="m@example.com" value={form.email} onChange={handleChange} required />
