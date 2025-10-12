@@ -12,6 +12,8 @@ interface User {
   avatar: string; // Nueva propiedad para la URL del avatar
   role: string; // Rol del usuario (ADMIN, OPERADOR, etc)
   roles?: number[]; // Array de IDs de roles
+  // hint booleano si backend expone is_active
+  isActiveMaybe?: boolean | null;
   // Campos adicionales del perfil del usuario
   nombres?: string;
   apellidos?: string;
@@ -51,6 +53,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Normaliza el objeto raw que viene del backend a la forma que usa la app
   const normalizeUser = (rawUser: any): User => {
     if (!rawUser) return null as any;
+    // Support shape where backend returns a profile object that contains a nested `user` object
+    const nestedUser = rawUser.user || rawUser.usuario || rawUser.auth_user || null;
+    const merged = { ...(rawUser || {}) } as any;
+    if (nestedUser && typeof nestedUser === 'object') {
+      // prefer nested user fields for auth-related values
+      merged.email = nestedUser.email ?? merged.email;
+      merged.first_name = nestedUser.first_name ?? merged.first_name;
+      merged.last_name = nestedUser.last_name ?? merged.last_name;
+      merged.is_active = nestedUser.is_active ?? merged.is_active;
+    }
     // Obtener roles como array de números
     let roles: number[] = [];
     if (Array.isArray(rawUser.roles)) {
@@ -67,24 +79,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       roles = [rawUser.profile_id];
     }
 
-    // Nombre del usuario
-    const name = rawUser.nombre || rawUser.name || rawUser.full_name || rawUser.nombre_completo || rawUser.username || "Usuario";
-    const email = rawUser.email || "";
-    const avatar = rawUser.avatar || rawUser.avatar_url || rawUser.foto || "";
+  // Nombre del usuario y email/avatar
+  const name = merged.nombre || merged.name || merged.full_name || merged.nombre_completo || merged.username || "Usuario";
+  const email = merged.email || "";
+  const avatar = merged.avatar || merged.avatar_url || merged.foto || "";
 
-    // Determinar role string (en minúsculas)
-    // Preferir rol.nombre cuando backend devuelve el objeto {id,nombre}
-    let roleStr: string = "";
-    if (rawUser.rol && typeof rawUser.rol === "object" && rawUser.rol.nombre) {
-      roleStr = String(rawUser.rol.nombre).toLowerCase();
-    } else if (rawUser.role) {
-      roleStr = String(rawUser.role).toLowerCase();
-    } else if (roles.length > 0) {
-      // Intentar mapear id -> nombre usando ROLE_MAP, o usar el id como fallback
-      roleStr = String(ROLE_MAP[roles[0]] || roles[0]).toLowerCase();
-    }
+  // Determinar role string (en minúsculas)
+  // Preferir rol.nombre cuando backend devuelve el objeto {id,nombre}
+  let roleStr: string = "";
+  if (rawUser.rol && typeof rawUser.rol === "object" && rawUser.rol.nombre) {
+    roleStr = String(rawUser.rol.nombre).toLowerCase();
+  } else if (rawUser.role) {
+    roleStr = String(rawUser.role).toLowerCase();
+  } else if (roles.length > 0) {
+    // Intentar mapear id -> nombre usando ROLE_MAP, o usar el id como fallback
+    roleStr = String(ROLE_MAP[roles[0]] || roles[0]).toLowerCase();
+  }
 
-    return { id: String(rawUser.id || rawUser.pk || rawUser.user_id || ""), name, email, avatar, role: roleStr, roles } as User;
+  // profile fields available in /users/me/ (map them into the app shape)
+  const nombres = merged.first_name || merged.nombres || (merged.nombre ? String(merged.nombre).split('\n')[0] : undefined) || undefined;
+  const apellidos = merged.last_name || merged.apellidos || undefined;
+  const telefono = merged.telefono || merged.phone || merged.mobile || merged.telefono_movil || undefined;
+  const fecha_nacimiento = merged.fecha_nacimiento || merged.birth_date || merged.fecha || undefined;
+  const genero = merged.genero || merged.gender || undefined;
+  const documento_identidad = merged.documento_identidad || merged.document_number || merged.dni || undefined;
+  const pais = merged.pais || merged.country || undefined;
+
+  // explicit boolean hint when backend provides is_active
+  let isActiveMaybe: boolean | null = null;
+  if (merged.is_active === true || merged.is_active === 1) isActiveMaybe = true;
+  else if (merged.is_active === false || merged.is_active === 0) isActiveMaybe = false;
+
+  return {
+    id: String(rawUser.id || rawUser.pk || rawUser.user_id || ""),
+    name,
+    email,
+    avatar,
+    role: roleStr,
+    roles,
+    nombres: nombres as any,
+    apellidos: apellidos as any,
+    telefono: telefono as any,
+    fecha_nacimiento: fecha_nacimiento as any,
+    genero: genero as any,
+    documento_identidad: documento_identidad as any,
+    pais: pais as any,
+    isActiveMaybe,
+  } as User;
   };
 
   const reloadUser = async () => {

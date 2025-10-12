@@ -9,7 +9,7 @@ import { ChartAreaInteractive } from "./chart-area-interactive";
 
 import { useEffect } from 'react';
 import AdminBitacora from './admin-bitacora';
-import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser, listRoles } from "@/api/auth";
+import { listUsers, assignRole, editUser as editUserApi, disableUser, reactivateUser, listRoles, getUserById } from "@/api/auth";
 import { listarBackups, crearBackup, restaurarBackup, descargarBackup, eliminarBackup } from '@/api/backups_restore';
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
@@ -30,6 +30,14 @@ const SLUG_TO_ID: Record<string, number> = Object.entries(ROLE_MAP).reduce((acc,
 
 // Normalize a raw user object from backend into the local `User` shape
 const normalizeApiUser = (raw: any): User => {
+  // dev-only logging to help diagnose missing 'estado' values
+  try {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+      // Avoid noisy logs in production; provide compact display
+      // eslint-disable-next-line no-console
+      console.debug('[normalizeApiUser] raw keys:', Object.keys(raw || {}).sort().join(', '));
+    }
+  } catch {}
   const id = String(raw.id ?? raw.pk ?? raw.user_id ?? raw.uuid ?? "");
   const email = raw.email || raw.username || raw.usuario || "";
   const nombres = raw.nombres || raw.first_name || raw.nombre || raw.full_name || "";
@@ -74,7 +82,34 @@ const normalizeApiUser = (raw: any): User => {
   }
 
   // Estado normalization: accept multiple possible field names and formats
+  // Try direct known fields first
   let estado: any = raw.estado ?? raw.status ?? (raw.is_active !== undefined ? raw.is_active : undefined) ?? raw.active ?? raw.enabled ?? raw.habilitado ?? "";
+  // If not found, scan one level deep for common keys (some APIs nest user data)
+  if ((estado === '' || estado === undefined || estado === null) && raw && typeof raw === 'object') {
+    const commonKeys = ['is_active', 'isActive', 'active', 'estado', 'status', 'enabled', 'habilitado'];
+    for (const k of commonKeys) {
+      if (raw[k] !== undefined && raw[k] !== null) {
+        estado = raw[k];
+        break;
+      }
+    }
+    // Look into one level nested objects (e.g. raw.user, raw.usuario, raw.data)
+    if ((estado === '' || estado === undefined || estado === null)) {
+      const nestedCandidates = ['user', 'usuario', 'data', 'profile', 'attributes'];
+      for (const nc of nestedCandidates) {
+        const nested = raw[nc];
+        if (nested && typeof nested === 'object') {
+          for (const k of commonKeys) {
+            if (nested[k] !== undefined && nested[k] !== null) {
+              estado = nested[k];
+              break;
+            }
+          }
+          if (estado !== '' && estado !== undefined && estado !== null) break;
+        }
+      }
+    }
+  }
   // Normalize boolean-like values
   if (estado === true || estado === 1) estado = 'activo';
   else if (estado === false || estado === 0) estado = 'inactivo';
@@ -106,6 +141,9 @@ const normalizeApiUser = (raw: any): User => {
       roles,
       rolesSlugs,
   estado: String(estado || "").toLowerCase(),
+  // dev-only: show normalized resultado in console for debugging
+  // eslint-disable-next-line no-console
+  ...(typeof window !== 'undefined' && process.env.NODE_ENV !== 'production' ? { __normalized_debug: { estado: String(estado || "").toLowerCase(), isActiveMaybe } } : {}),
   // explicit boolean hint (true/false) when backend provides it, otherwise null
   isActiveMaybe,
       location: raw.location || raw.ciudad || raw.city || undefined,
@@ -128,6 +166,10 @@ interface User {
   roles?: number[]; // array de ids de roles
   rolesSlugs?: string[]; // array de slugs cuando backend devuelve slugs
   estado: string;
+  // explicit boolean hint when backend provides is_active/active/etc
+  isActiveMaybe?: boolean | null;
+  // dev-only debug payload attached during normalization (not present in production)
+  __normalized_debug?: { estado?: string; isActiveMaybe?: boolean | null };
   location?: string;
   registrationDate?: string;
   telefono?: string;
@@ -210,7 +252,23 @@ const AdminDashboard = () => {
         const res = await listUsers();
         // listUsers returns { data: [...], meta?: {count,...} } or { data: results }
         const arr = res?.data || [];
-        const mapped = Array.isArray(arr) ? arr.map(normalizeApiUser) : [];
+        // dev-only logging to inspect server response and normalized users
+        if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+          try {
+            // eslint-disable-next-line no-console
+            console.debug('[AdminDashboard] listUsers response sample:', Array.isArray(arr) ? arr.slice(0,3) : arr);
+          } catch {}
+        }
+        const mapped = Array.isArray(arr) ? arr.map(a => {
+          const nu = normalizeApiUser(a);
+          if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+            try {
+              // eslint-disable-next-line no-console
+              console.debug('[AdminDashboard] normalized user]', { id: nu.id, estado: nu.estado, isActiveMaybe: nu.isActiveMaybe, rawSampleKeys: Object.keys(a || {}).slice(0,5) });
+            } catch {}
+          }
+          return nu;
+        }) : [];
         setUsers(mapped);
       } catch (e) {
         setError("No se pudieron cargar los usuarios");
@@ -368,20 +426,41 @@ const AdminDashboard = () => {
     setShowRoleModal(false);
   };
 
-  // Abrir modal de edición y setear datos
-  const handleOpenEditModal = (user: User) => {
-    setEditUser(user);
-    setEditForm({
-      nombres: user.nombres || user.name || "",
-      apellidos: user.apellidos || "",
-      telefono: user.telefono || "",
-      fecha_nacimiento: user.fecha_nacimiento ? user.fecha_nacimiento.substring(0, 10) : "",
-      genero: user.genero || "",
-      documento_identidad: user.documento_identidad || "",
-      pais: user.pais || "",
-      email: user.email || ""
-    });
-    setShowEditModal(true);
+  // Abrir modal de edición y setear datos (fetch detail to ensure full profile fields are available)
+  const handleOpenEditModal = async (user: User) => {
+    try {
+      // attempt to fetch detailed user from server to populate all fields reliably
+      const res = await getUserById(String(user.id));
+      const data = res?.data || res;
+      // normalise shape using existing helper; if server returns nested object, normalizeApiUser handles it
+      const detailed = normalizeApiUser(data);
+      setEditUser(detailed);
+      setEditForm({
+        nombres: detailed.nombres || detailed.name || "",
+        apellidos: detailed.apellidos || "",
+        telefono: detailed.telefono || "",
+        fecha_nacimiento: detailed.fecha_nacimiento ? String(detailed.fecha_nacimiento).substring(0, 10) : "",
+        genero: detailed.genero || "",
+        documento_identidad: detailed.documento_identidad || "",
+        pais: detailed.pais || "",
+        email: detailed.email || ""
+      });
+      setShowEditModal(true);
+    } catch (err) {
+      // fallback to using the passed user if detail fetch fails
+      setEditUser(user);
+      setEditForm({
+        nombres: user.nombres || user.name || "",
+        apellidos: user.apellidos || "",
+        telefono: user.telefono || "",
+        fecha_nacimiento: user.fecha_nacimiento ? user.fecha_nacimiento.substring(0, 10) : "",
+        genero: user.genero || "",
+        documento_identidad: user.documento_identidad || "",
+        pais: user.pais || "",
+        email: user.email || ""
+      });
+      setShowEditModal(true);
+    }
   };
   // Cerrar modal de edición
   const handleCloseEditModal = () => {
@@ -408,21 +487,27 @@ const AdminDashboard = () => {
     e.preventDefault();
     if (!editUser) return;
     try {
-      const response = await editUserApi(editUser.id, {
-        nombres: editForm.nombres,
-        apellidos: editForm.apellidos,
-        telefono: editForm.telefono,
+      // Build payload: nested `user` object for auth fields and top-level profile fields
+      const payload: any = {
+        user: {
+          first_name: editForm.nombres || undefined,
+          last_name: editForm.apellidos || undefined,
+        },
+        telefono: editForm.telefono || undefined,
         fecha_nacimiento: editForm.fecha_nacimiento || null,
-        genero: editForm.genero,
+        genero: editForm.genero || undefined,
         documento_identidad: editForm.documento_identidad || null,
-        pais: editForm.pais,
-        email: editForm.email,
-      });
-      // Solo mostrar error si el status es >= 400
-      if (response && response.status && response.status >= 400) {
-        setError("Error al editar usuario");
-        return;
-      }
+        pais: editForm.pais || undefined,
+      };
+
+      const response = await editUserApi(editUser.id, payload);
+      // axios response expected; use response.data when available
+      const updatedRaw = response?.data || response;
+      const updated = normalizeApiUser(updatedRaw);
+
+      // Update single user row in state for a snappy UX
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+
       setShowEditModal(false);
       setEditUser(null);
       setEditForm({
@@ -435,25 +520,29 @@ const AdminDashboard = () => {
         pais: "",
         email: ""
       });
-  // Refrescar usuarios
-  setLoading(true);
-  const res = await listUsers();
-  const arr = res?.data || [];
-  setUsers(Array.isArray(arr) ? arr.map(normalizeApiUser) : []);
-  setLoading(false);
+
       setError(null);
       toast({
         title: "✅ ¡Usuario modificado con éxito!",
         description: "Los datos del usuario han sido actualizados correctamente.",
         duration: 3500,
       });
-    } catch (err) {
-      toast({
-        title: "❌ Error al modificar usuario",
-        description: "Ocurrió un problema al guardar los cambios. Intenta nuevamente.",
-        variant: "destructive",
-        duration: 3500,
-      });
+    } catch (err: any) {
+      // If server returned validation errors in err.response.data, show a toast and keep modal open for correction
+      const serverData = err?.response?.data;
+      if (serverData && typeof serverData === 'object') {
+        // show first validation message if available
+        const firstKey = Object.keys(serverData)[0];
+        const firstMsg = Array.isArray(serverData[firstKey]) ? serverData[firstKey][0] : String(serverData[firstKey]);
+        toast({ title: 'Error de validación', description: firstMsg || 'Datos inválidos', variant: 'destructive' });
+      } else {
+        toast({
+          title: "❌ Error al modificar usuario",
+          description: "Ocurrió un problema al guardar los cambios. Intenta nuevamente.",
+          variant: "destructive",
+          duration: 3500,
+        });
+      }
       setError("Error al editar usuario");
     }
   };

@@ -8,7 +8,7 @@ export const reactivateUser = async (id: string) => {
   } catch (err: any) {
     // fallback to legacy endpoint
     try {
-      return await api.post(`/usuarios/${id}/reactivar/`);
+      return await api.post(`/users/${id}/reactivar/`);
     } catch (fallbackErr) {
       throw fallbackErr;
     }
@@ -22,7 +22,7 @@ export const disableUser = async (id: string) => {
   } catch (err: any) {
     // fallback to legacy endpoint
     try {
-      return await api.post(`/usuarios/${id}/inhabilitar/`);
+      return await api.post(`/users/${id}/inhabilitar/`);
     } catch (fallbackErr) {
       throw fallbackErr;
     }
@@ -39,8 +39,28 @@ export interface EditUserData {
   pais?: string;
   email: string;
 }
-export const editUser = async (id: string, data: EditUserData) => {
-  return api.put(`/usuarios/${id}/editar-datos/`, data);
+export const editUser = async (id: string, data: Partial<EditUserData> | any) => {
+  // Use PATCH /users/{id}/ for partial updates (admin editing another user)
+  try {
+    return await api.patch(`/users/${id}/`, data);
+  } catch (err) {
+    const e = err as any;
+    // If server returns 405 Method Not Allowed for PATCH, try PUT on the same URL
+    if (e?.response?.status === 405) {
+      try {
+        return await api.put(`/users/${id}/`, data);
+      } catch (putErr) {
+        // if PUT fails, continue to legacy fallback below
+        e.response = e.response || {};
+      }
+    }
+    // Fallback to legacy path if server exposes it (best-effort)
+    try {
+      return await api.put(`/usuarios/${id}/editar-datos/`, data);
+    } catch (fallbackErr) {
+      throw fallbackErr;
+    }
+  }
 };
 export const login = async (email: string, password: string) => {
   try {
@@ -102,7 +122,7 @@ export const getUser = async () => {
     return api.get(override);
   }
 
-  const candidates = ["usuarios/me/", "users/me/", "auth/user/"];
+  const candidates = ["users/me/", "usuarios/me/", "auth/user/"];
   let lastError: any = null;
 
   // Try common 'me' endpoints first
@@ -123,7 +143,7 @@ export const getUser = async () => {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id) {
           try {
-            return await api.get(`/usuarios/${parsed.id}/`);
+            return await api.get(`/users/${parsed.id}/`);
           } catch (err: any) {
             lastError = err;
           }
@@ -151,6 +171,20 @@ export const getUser = async () => {
   throw lastError || new Error("No user endpoint matched");
 };
 
+// Get any user's detail by id (admin). Prefer canonical endpoint `/users/{id}/`.
+export const getUserById = async (id: string) => {
+  try {
+    return await api.get(`/users/${id}/`);
+  } catch (err: any) {
+    // fallback to legacy path if needed
+    try {
+      return await api.get(`/usuarios/${id}/`);
+    } catch (fallbackErr) {
+      throw fallbackErr;
+    }
+  }
+};
+
 // Editar datos del usuario autenticado
 export interface UpdateUserData {
   nombres?: string;
@@ -164,7 +198,13 @@ export interface UpdateUserData {
 }
 
 export const updateUserProfile = async (data: UpdateUserData) => {
-  return api.patch("/usuarios/me/", data);
+  // Use canonical /users/me/ endpoint per backend guide
+  try {
+    return await api.patch('/users/me/', data);
+  } catch (err) {
+    // fallback for older deployments
+    return api.patch('/users/me/', data);
+  }
 };
 
 // Solicitar código de seguridad para cambio de contraseña
@@ -215,7 +255,7 @@ export const listUsers = async () => {
     // Fallback to Spanish endpoint used historically in this repo
     let res;
     try {
-      res = await api.get("/usuarios/");
+      res = await api.get("/users/");
     } catch (fallbackErr) {
       // Log fallback error too and rethrow so caller can see details
       try {
@@ -246,7 +286,7 @@ export const assignRole = async (id: string, rol: string) => {
     } catch {}
     // fallback to historical endpoint
     try {
-      return await api.post(`/usuarios/${id}/asignar-rol/`, { rol });
+      return await api.post(`/users/${id}/asignar-rol/`, { rol });
     } catch (fallbackErr: any) {
       try {
         const fe = fallbackErr as any;
