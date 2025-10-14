@@ -13,6 +13,7 @@ import { useSearchParams } from "next/navigation"
 import AdminDashboard from "@/components/admin-dashboard"
 import AdminReservasDashboard from "@/components/admin-reservas-dashboard-fixed"
 import AdminPoliticasDescuentosDashboard from "@/components/admin-politicas-descuentos-dashboard"
+import AdminCampanasDashboard from "@/components/admin-campanas-dashboard"
 // If the file exists with a different name or path, update the import accordingly.
 // Example:
 // import AdminPoliticasDescuentosDashboard from "@/components/AdminPoliticasDescuentosDashboard"
@@ -50,6 +51,8 @@ export default function Page() {
                   <AdminReservasDashboard />
                 ) : tab === "politicas" ? (
                   <AdminPoliticasDescuentosDashboard />
+                ) : tab === "campanas" ? (
+                  <AdminCampanasDashboard />
                 ) : (
                   <>
                     <SectionCards />

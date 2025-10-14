@@ -43,8 +43,9 @@ const data = {
     { title: "Dashboard", url: "/panel", icon: IconDashboard },
     { title: "Gestión de usuarios", url: "/panel?tab=usuarios", icon: IconUsers },
     { title: "Gestión de reservas", url: "/panel?tab=reservas", icon: IconListDetails },
-    { title: "Políticas de cupones", url: "/panel?tab=politicas", icon: IconListDetails },
-    { title: "Gestión de informes", url: "#", icon: IconChartBar },
+  { title: "Políticas de cupones", url: "/panel?tab=politicas", icon: IconListDetails },
+  { title: "Campañas", url: "/panel?tab=campanas", icon: IconReport },
+  { title: "Gestión de informes", url: "#", icon: IconChartBar },
    // { title: "Projects", url: "#", icon: IconFolder },
     
   ],
