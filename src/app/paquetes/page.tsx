@@ -23,7 +23,7 @@ const PaquetesPage: React.FC = () => {
   const [paqueteSeleccionado, setPaqueteSeleccionado] = useState<Paquete | null>(null);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/paquetes/`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/paquetes/`)
       .then((res) => {
         if (!res.ok) throw new Error("Error al cargar paquetes");
         return res.json();
