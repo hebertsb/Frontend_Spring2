@@ -46,6 +46,9 @@ next-env.d.ts
 # Ignore markdown files
 *.md
 
+# Carpeta de pruebas
+pruebas/
+
 # Archivos de test
 *.test.js
 *.test.ts
