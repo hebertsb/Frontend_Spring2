@@ -1,3 +1,4 @@
+// Archivo eliminado por reinicio de funcionalidad de paquetes
 import axios from './axios';
 
 // ============================================

@@ -46,6 +46,7 @@ export default function RootLayout({
           <AuthProvider>
             <SidebarProvider>
               <div className="min-h-screen w-full overflow-y-auto">
+                {/* <BackendStatus className="fixed top-4 right-4 z-50" /> */}
                 <Toaster />
                 {children}
               </div>

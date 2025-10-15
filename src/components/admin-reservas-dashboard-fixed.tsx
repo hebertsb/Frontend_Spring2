@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useState, useEffect, ChangeEvent } from "react";
 import { Calendar, Edit, Trash2, Eye, EyeOff, MapPin, Users, Star, CheckCircle, X, User, Phone, Mail, Clock, DollarSign } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { listarReservas, crearReserva, editarReserva, eliminarReserva } from "@/api/reservas";
+import { obtenerVisitantesReserva } from "@/api/visitantes";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 
@@ -55,116 +55,107 @@ const AdminReservasDashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingReserva, setDeletingReserva] = useState<Reserva | null>(null);
 
+  // 🔧 FUNCIÓN HELPER PARA COMPATIBILIDAD CON DJANGO BACKEND
+  const procesarReservaDjango = async (reserva: any): Promise<Reserva> => {
+    try {
+      // Estructura Django: puede tener visitantes en endpoint separado
+      let numeroPersonas = 1; // Por defecto, al menos el titular
+      let cliente = "";
+      let clienteEmail = "";
+      let telefono = "";
+
+      // Si tiene usuario directamente (compatible con estructura anterior)
+      if (reserva.usuario) {
+        cliente = `${reserva.usuario.nombres || ''} ${reserva.usuario.apellidos || ''}`.trim();
+        clienteEmail = reserva.usuario.email || '';
+        telefono = reserva.usuario.telefono || '';
+      } 
+      // Si solo tiene el ID del cliente, intentar obtener más info
+      else if (reserva.cliente) {
+        cliente = `Cliente ${reserva.cliente}`;
+        // Aquí podrías hacer una llamada a /usuarios/{id}/ si necesitas más detalles
+      }
+
+      // Intentar obtener visitantes de la reserva
+      try {
+        const visitantesResponse = await obtenerVisitantesReserva(reserva.id);
+        const visitantes = visitantesResponse.data?.results || visitantesResponse.data || [];
+        
+        if (visitantes.length > 0) {
+          numeroPersonas = visitantes.length;
+          
+          // Buscar el titular para obtener info del cliente
+          const titular = visitantes.find((v: any) => v.visitante?.es_titular || v.es_titular);
+          if (titular && titular.visitante) {
+            cliente = `${titular.visitante.nombre} ${titular.visitante.apellido}`;
+            clienteEmail = titular.visitante.email || '';
+            telefono = titular.visitante.telefono || '';
+          }
+        }
+      } catch (error) {
+        console.log("ℹ️ No se pudieron obtener visitantes para reserva", reserva.id);
+        // No es crítico, continuamos con los datos base
+      }
+
+      return {
+        id: reserva.id?.toString() || '',
+        cliente: cliente || 'Cliente no especificado',
+        clienteEmail: clienteEmail,
+        destino: `Reserva ${reserva.fecha || new Date(reserva.fecha_inicio || Date.now()).toLocaleDateString()}`,
+        paquete: `Tour $${reserva.total || '0'}`,
+        fecha: reserva.fecha || (reserva.fecha_inicio ? new Date(reserva.fecha_inicio).toLocaleDateString() : ''),
+        estado: reserva.estado?.toLowerCase() || 'pendiente',
+        precio: parseFloat(reserva.total || '0'),
+        precioUnitario: parseFloat(reserva.total || '0') / numeroPersonas,
+        telefono: telefono,
+        numeroPersonas: numeroPersonas,
+        tipoServicio: 'Servicio Turístico',
+        // Campos originales del backend para compatibilidad
+        usuario: reserva.usuario || null,
+        fecha_inicio: reserva.fecha_inicio,
+        total: reserva.total,
+        detalles: reserva.detalles || [],
+        acompanantes: reserva.acompanantes || [],
+      };
+    } catch (error) {
+      console.error("Error procesando reserva Django:", error);
+      // Fallback a estructura básica
+      return {
+        id: reserva.id?.toString() || '',
+        cliente: 'Error al cargar cliente',
+        clienteEmail: '',
+        destino: 'Error al cargar',
+        paquete: 'Error al cargar',
+        fecha: '',
+        estado: 'pendiente',
+        precio: 0,
+        precioUnitario: 0,
+        telefono: '',
+        numeroPersonas: 1,
+        tipoServicio: '',
+        usuario: null,
+        fecha_inicio: reserva.fecha_inicio,
+        total: reserva.total,
+        detalles: [],
+        acompanantes: [],
+      };
+    }
+  };
+
   // Función para recargar reservas (reutilizable)
   const recargarReservas = async () => {
     try {
       setLoading(true);
       const res = await listarReservas();
-      console.log("🔄 Recargando reservas...", res.data);
+      console.log("🔄 Recargando reservas DJANGO...", res.data);
       
-      // Usar la misma lógica de mapeo que en el useEffect inicial
-      const reservasMapeadas = res.data.map((reserva: any) => {
-        console.log("🔍 Procesando reserva para recarga:");
-        console.log("  - ID:", reserva.id);
-        console.log("  - Estado original:", reserva.estado);
-        console.log("  - Tipo de estado:", typeof reserva.estado);
-        
-        const detalle = reserva.detalles?.[0] || {};
-        
-        const extraerDestino = (detalle: any): string => {
-          const detalleObj = Array.isArray(detalle) ? detalle[0] : detalle;
-          
-          if (!detalleObj || typeof detalleObj !== 'object') {
-            return 'Destino no especificado';
-          }
-          
-          if (detalleObj.tipo && typeof detalleObj.tipo === 'string' && detalleObj.tipo.trim() !== '') {
-            return detalleObj.tipo;
-          }
-          
-          if (detalleObj.titulo && typeof detalleObj.titulo === 'string') {
-            const titulo = detalleObj.titulo;
-            const lugaresPosibles = ['Uyuni', 'Titicaca', 'Copacabana', 'La Paz', 'Sucre', 'Cochabamba', 'Santa Cruz', 'Potosí', 'Oruro', 'Tarija'];
-            for (const lugar of lugaresPosibles) {
-              if (titulo.toLowerCase().includes(lugar.toLowerCase())) {
-                return lugar;
-              }
-            }
-          }
-          
-          return 'Destino no especificado';
-        };
-        
-        const extraerPaquete = (detalle: any): string => {
-          const detalleObj = Array.isArray(detalle) ? detalle[0] : detalle;
-          
-          if (!detalleObj || typeof detalleObj !== 'object') {
-            return 'Paquete no especificado';
-          }
-          
-          if (detalleObj.titulo && typeof detalleObj.titulo === 'string' && detalleObj.titulo.trim() !== '') {
-            return detalleObj.titulo;
-          }
-          
-          return 'Paquete no especificado';
-        };
-        
-        const calcularPrecioUnitario = (detalles: any[]): number => {
-          if (!detalles || detalles.length === 0) return 0;
-          
-          const precios = detalles
-            .map(detalle => parseFloat(detalle.precio_unitario || '0'))
-            .filter(precio => precio > 0);
-            
-          if (precios.length === 0) return 0;
-          
-          return precios.reduce((sum, precio) => sum + precio, 0) / precios.length;
-        };
-        
-        const destinoExtraido = extraerDestino(detalle);
-        const paqueteExtraido = extraerPaquete(detalle);
-        const precioUnitarioCalculado = calcularPrecioUnitario(reserva.detalles || []);
-        
-        let destinoFinal = destinoExtraido;
-        let paqueteFinal = paqueteExtraido;
-        
-        if (destinoFinal === 'Destino no especificado' && paqueteFinal === 'Paquete no especificado') {
-          const fecha = reserva.fecha_inicio ? new Date(reserva.fecha_inicio).toLocaleDateString() : '';
-          destinoFinal = `Reserva ${fecha}`;
-          paqueteFinal = `Tour ${reserva.total ? `$${reserva.total}` : 'Sin precio'}`;
-        }
-        
-        const estadoFinal = reserva.estado?.toLowerCase() || 'pendiente';
-        console.log("  - Estado final mapeado:", estadoFinal);
-        
-        const reservaMapeada = {
-          id: reserva.id?.toString() || '',
-          cliente: reserva.usuario ? `${reserva.usuario.nombres || ''} ${reserva.usuario.apellidos || ''}`.trim() : '',
-          clienteEmail: reserva.usuario?.email || '',
-          destino: destinoFinal,
-          paquete: paqueteFinal,
-          fecha: reserva.fecha_inicio ? new Date(reserva.fecha_inicio).toLocaleDateString() : '',
-          estado: estadoFinal,
-          precio: parseFloat(reserva.total || '0'),
-          precioUnitario: precioUnitarioCalculado,
-          telefono: reserva.usuario?.telefono || '',
-          numeroPersonas: (reserva.acompanantes?.length || 0) + 1,
-          tipoServicio: (reserva.detalles?.[0]?.tipo || ''),
-          usuario: reserva.usuario,
-          fecha_inicio: reserva.fecha_inicio,
-          total: reserva.total,
-          detalles: reserva.detalles,
-          acompanantes: reserva.acompanantes
-        };
-        
-        console.log("  - Objeto final:", {
-          id: reservaMapeada.id,
-          estado: reservaMapeada.estado,
-          cliente: reservaMapeada.cliente
-        });
-        
-        return reservaMapeada;
-      });
+      // 🚀 USAR NUEVA LÓGICA DJANGO COMPATIBLE
+      const reservasMapeadas = await Promise.all(
+        res.data.map(async (reserva: any) => {
+          console.log("🔍 Procesando reserva Django para recarga:", reserva.id);
+          return await procesarReservaDjango(reserva);
+        })
+      );
       
       console.log("🔄 Total de reservas mapeadas:", reservasMapeadas.length);
       console.log("🔄 Estados de reservas mapeadas:", reservasMapeadas.map((r: any) => ({ id: r.id, estado: r.estado })));
@@ -197,208 +188,35 @@ const AdminReservasDashboard = () => {
   };
 
   useEffect(() => {
-    setLoading(true);
-    listarReservas()
-      .then(res => {
-        console.log("📝 Datos de reservas recibidos:", res.data);
-        console.log("📊 Primera reserva ejemplo:", res.data[0]);
+    const cargarReservas = async () => {
+      setLoading(true);
+      try {
+        console.log("📝 Cargando reservas con DJANGO BACKEND...");
+        const res = await listarReservas();
+        console.log("📝 Datos de reservas Django recibidos:", res.data);
         
-        // Mostrar estructura completa de las primeras 3 reservas
-        res.data.slice(0, 3).forEach((reserva: any, index: number) => {
-          console.log(`\n=== RESERVA ${index + 1} ===`);
-          console.log("ID:", reserva.id);
-          console.log("Estado:", reserva.estado);
-          console.log("Total:", reserva.total);
-          console.log("Fecha inicio:", reserva.fecha_inicio);
-          console.log("Usuario:", reserva.usuario);
-          console.log("Detalles:", reserva.detalles);
-          console.log("Acompañantes:", reserva.acompanantes);
-          
-          if (reserva.detalles && reserva.detalles.length > 0) {
-            console.log("Primer detalle:", reserva.detalles[0]);
-            console.log("Claves del primer detalle:", Object.keys(reserva.detalles[0]));
-          }
-        });
+        // 🚀 PROCESAR CON NUEVA LÓGICA DJANGO
+        const reservasMapeadas = await Promise.all(
+          res.data.map(async (reserva: any) => {
+            console.log("🔍 Procesando reserva Django inicial:", reserva.id);
+            return await procesarReservaDjango(reserva);
+          })
+        );
         
-        // Mapear los datos del backend al formato esperado por el frontend
-        const reservasMapeadas = res.data.map((reserva: any) => {
-          console.log("🔍 Procesando reserva:", reserva);
-          console.log("📋 Detalles de la reserva:", reserva.detalles);
-          console.log("📋 Estructura completa del detalle:", JSON.stringify(reserva.detalles, null, 2));
-          
-          // Extraer información del detalle
-          const detalle = reserva.detalles?.[0] || {};
-          console.log("📦 Detalle extraído:", detalle);
-          
-          // Función para extraer destino de diferentes posibles campos
-          const extraerDestino = (detalle: any): string => {
-            // Si detalle es un array, tomar el primer elemento
-            const detalleObj = Array.isArray(detalle) ? detalle[0] : detalle;
-            
-            if (!detalleObj || typeof detalleObj !== 'object') {
-              return 'Destino no especificado';
-            }
-            
-            // Para tu estructura específica, usar 'tipo' como destino principal
-            if (detalleObj.tipo && typeof detalleObj.tipo === 'string' && detalleObj.tipo.trim() !== '') {
-              console.log(`🎯 Destino encontrado en campo 'tipo':`, detalleObj.tipo);
-              return detalleObj.tipo;
-            }
-            
-            // Si no hay 'tipo', intentar extraer del título
-            if (detalleObj.titulo && typeof detalleObj.titulo === 'string') {
-              const titulo = detalleObj.titulo;
-              // Extraer ubicación del título si contiene nombres de lugares conocidos
-              const lugaresPosibles = ['Uyuni', 'Titicaca', 'Copacabana', 'La Paz', 'Sucre', 'Cochabamba', 'Santa Cruz', 'Potosí', 'Oruro', 'Tarija'];
-              for (const lugar of lugaresPosibles) {
-                if (titulo.toLowerCase().includes(lugar.toLowerCase())) {
-                  console.log(`🎯 Destino extraído del título '${lugar}':`, lugar);
-                  return lugar;
-                }
-              }
-            }
-            
-            // Buscar en otros campos posibles
-            const posiblesCampos = [
-              'destino', 'lugar', 'ubicacion', 'destination', 'location',
-              'nombre_destino', 'ciudad', 'provincia', 'region', 'place',
-              'site', 'area', 'zona'
-            ];
-            
-            for (const campo of posiblesCampos) {
-              if (detalleObj[campo] && typeof detalleObj[campo] === 'string' && detalleObj[campo].trim() !== '') {
-                console.log(`🎯 Destino encontrado en campo '${campo}':`, detalleObj[campo]);
-                return detalleObj[campo];
-              }
-            }
-            
-            // Buscar en campos anidados
-            for (const [key, value] of Object.entries(detalleObj)) {
-              if (typeof value === 'object' && value !== null) {
-                const resultado: string = extraerDestino(value);
-                if (resultado !== 'Destino no especificado') {
-                  return resultado;
-                }
-              }
-            }
-            
-            console.log("❌ No se encontró destino en:", Object.keys(detalleObj));
-            return 'Destino no especificado';
-          };
-          
-          // Función para extraer paquete de diferentes posibles campos
-          const extraerPaquete = (detalle: any): string => {
-            // Si detalle es un array, tomar el primer elemento
-            const detalleObj = Array.isArray(detalle) ? detalle[0] : detalle;
-            
-            if (!detalleObj || typeof detalleObj !== 'object') {
-              return 'Paquete no especificado';
-            }
-            
-            // Para tu estructura específica, usar 'titulo' como paquete principal
-            if (detalleObj.titulo && typeof detalleObj.titulo === 'string' && detalleObj.titulo.trim() !== '') {
-              console.log(`📦 Paquete encontrado en campo 'titulo':`, detalleObj.titulo);
-              return detalleObj.titulo;
-            }
-            
-            // Buscar en otros campos posibles
-            const posiblesCampos = [
-              'paquete', 'tour', 'servicio', 'package', 'nombre_paquete', 
-              'tipo_tour', 'actividad', 'experiencia', 'nombre',
-              'title', 'name', 'service', 'plan', 'oferta'
-            ];
-            
-            for (const campo of posiblesCampos) {
-              if (detalleObj[campo] && typeof detalleObj[campo] === 'string' && detalleObj[campo].trim() !== '') {
-                console.log(`📦 Paquete encontrado en campo '${campo}':`, detalleObj[campo]);
-                return detalleObj[campo];
-              }
-            }
-            
-            // Buscar en campos anidados
-            for (const [key, value] of Object.entries(detalleObj)) {
-              if (typeof value === 'object' && value !== null) {
-                const resultado: string = extraerPaquete(value);
-                if (resultado !== 'Paquete no especificado') {
-                  return resultado;
-                }
-              }
-            }
-            
-            console.log("❌ No se encontró paquete en:", Object.keys(detalleObj));
-            return 'Paquete no especificado';
-          };
-          
-          // Función para calcular precio unitario promedio de todos los servicios
-          const calcularPrecioUnitario = (detalles: any[]): number => {
-            if (!detalles || detalles.length === 0) return 0;
-            
-            const precios = detalles
-              .map(detalle => parseFloat(detalle.precio_unitario || '0'))
-              .filter(precio => precio > 0);
-              
-            if (precios.length === 0) return 0;
-            
-            return precios.reduce((sum, precio) => sum + precio, 0) / precios.length;
-          };
-          
-          const destinoExtraido = extraerDestino(detalle);
-          const paqueteExtraido = extraerPaquete(detalle);
-          const precioUnitarioCalculado = calcularPrecioUnitario(reserva.detalles || []);
-          
-          // Si aún no tenemos destino/paquete, intentar extraer de otros lugares
-          let destinoFinal = destinoExtraido;
-          let paqueteFinal = paqueteExtraido;
-          
-          // Intentar extraer del total de la reserva si no hay datos específicos
-          if (destinoFinal === 'Destino no especificado' && paqueteFinal === 'Paquete no especificado') {
-            // Crear nombres basados en la fecha y el total para identificar las reservas
-            const fecha = reserva.fecha_inicio ? new Date(reserva.fecha_inicio).toLocaleDateString() : '';
-            destinoFinal = `Reserva ${fecha}`;
-            paqueteFinal = `Tour ${reserva.total ? `$${reserva.total}` : 'Sin precio'}`;
-          }
-          
-          return {
-            id: reserva.id?.toString() || '',
-            cliente: reserva.usuario ? `${reserva.usuario.nombres || ''} ${reserva.usuario.apellidos || ''}`.trim() : '',
-            clienteEmail: reserva.usuario?.email || '',
-            destino: destinoFinal,
-            paquete: paqueteFinal,
-            fecha: reserva.fecha_inicio ? new Date(reserva.fecha_inicio).toLocaleDateString() : '',
-            estado: reserva.estado?.toLowerCase() || 'pendiente',
-            precio: parseFloat(reserva.total || '0'),
-            precioUnitario: precioUnitarioCalculado,
-            telefono: reserva.usuario?.telefono || '',
-            numeroPersonas: (reserva.acompanantes?.length || 0) + 1,
-            tipoServicio: (reserva.detalles?.[0]?.tipo || ''),
-            // Mantener datos originales
-            usuario: reserva.usuario,
-            fecha_inicio: reserva.fecha_inicio,
-            total: reserva.total,
-            detalles: reserva.detalles,
-            acompanantes: reserva.acompanantes
-          };
-        });
-        
-        console.log("🔄 Reservas mapeadas:", reservasMapeadas);
-        console.log("🎯 Primera reserva mapeada:", reservasMapeadas[0]);
-        
-        // Debug de estados
-        console.log("📊 Estados únicos encontrados:", Array.from(new Set(reservasMapeadas.map((r: any) => r.estado))));
-        console.log("📊 Conteo por estados:", {
-          pendiente: reservasMapeadas.filter((r: any) => r.estado === 'pendiente').length,
-          pagada: reservasMapeadas.filter((r: any) => r.estado === 'pagada').length,
-          cancelada: reservasMapeadas.filter((r: any) => r.estado === 'cancelada').length,
-          reprogramada: reservasMapeadas.filter((r: any) => r.estado === 'reprogramada').length,
-        });
-        
+        console.log("✅ Reservas Django procesadas:", reservasMapeadas.length);
         setReservas(reservasMapeadas);
-      })
-      .catch(() => setError("No se pudieron cargar las reservas"))
-      .finally(() => setLoading(false));
+        setLoading(false);
+      } catch (error) {
+        console.error("❌ Error cargando reservas Django:", error);
+        setError("No se pudieron cargar las reservas");
+        setLoading(false);
+      }
+    };
+    
+    cargarReservas();
   }, []);
 
-  const filteredReservas = reservas.filter(reserva => {
+  const filteredReservas = reservas.filter((reserva: Reserva) => {
     // Filtro de búsqueda por cliente, destino o paquete
     const matchesSearch = (reserva.cliente || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                          (reserva.destino || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -414,7 +232,7 @@ const AdminReservasDashboard = () => {
   });
 
   // Obtener destinos únicos para el filtro
-  const destinosUnicos = Array.from(new Set(reservas.map(r => r.destino).filter(destino => destino && destino.trim() !== "")));
+  const destinosUnicos = Array.from(new Set(reservas.map((r: Reserva) => r.destino).filter((destino: string | undefined) => destino && destino.trim() !== "")));
 
   // Función para abrir el modal de detalles
   const verDetallesReserva = (reserva: Reserva) => {
@@ -739,12 +557,12 @@ const AdminReservasDashboard = () => {
                   placeholder="Buscar por cliente, destino o paquete..."
                   className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base min-w-0"
                   value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                 />
                 <select
                   className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   value={filterEstado}
-                  onChange={e => setFilterEstado(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterEstado(e.target.value)}
                 >
                   <option value="todos">Todos los estados</option>
                   {estados.map(estado => (
@@ -754,7 +572,7 @@ const AdminReservasDashboard = () => {
                 <select
                   className="px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   value={filterDestino}
-                  onChange={e => setFilterDestino(e.target.value)}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) => setFilterDestino(e.target.value)}
                 >
                   <option value="todos">Todos los destinos</option>
                   {destinosUnicos.map(destino => (

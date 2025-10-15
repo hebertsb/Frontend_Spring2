@@ -1,7 +1,11 @@
-"use client";
 
+"use client";
+// import { crearPago } from "../api/pagos";
+import BotonStripeCheckout from "./BotonStripeCheckout";
 import type React from "react";
 import { useState, useEffect } from "react";
+// ...existing code...
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -31,9 +35,15 @@ import useAuth from "@/hooks/useAuth";
 import { crearReserva } from "@/api/reservas";
 import {
   detectarTipoServicio,
-  prepararReservaServicio,
+  prepararReservaDestino,
   prepararReservaPaquete,
+  obtenerPaqueteTuristico,
 } from "@/api/paquetes";
+import { 
+  crearVisitante, 
+  asociarVisitanteReserva, 
+  convertirFormularioAVisitante 
+} from "@/api/visitantes";
 
 // Tipos basados en la documentación del backend
 interface Acompanante {
@@ -93,6 +103,12 @@ export default function FlujoReservaModerno({
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Guardar el ID de la última reserva creada
+  const [ultimaReservaId, setUltimaReservaId] = useState<number | null>(null);
+
+
+  // --- Stripe Checkout ---
+
   // Estado del formulario
   const [formulario, setFormulario] = useState<FormularioReserva>({
     titular: {
@@ -117,8 +133,13 @@ export default function FlujoReservaModerno({
 
   const [procesandoReserva, setProcesandoReserva] = useState(false);
   const [pasoActual, setPasoActual] = useState<
-    "titular" | "acompanantes" | "detalles" | "confirmacion"
+    "titular" | "acompanantes" | "detalles" | "confirmacion" | "pago"
   >("titular");
+
+  // Debug: Monitorear cambios en el paso actual
+  useEffect(() => {
+    console.log("🎯 PASO ACTUAL CAMBIÓ A:", pasoActual);
+  }, [pasoActual]);
 
   // Debug: Monitorear cambios en el servicio seleccionado
   useEffect(() => {
@@ -150,17 +171,39 @@ export default function FlujoReservaModerno({
         name: user.name,
       });
 
+      // Separar nombre y apellido correctamente
+      const nombreCompleto = user.nombres || user.name || "";
+      const apellidoCompleto = user.apellidos || "";
+      
+      // Si el nombre completo está en el campo nombres, intentar separarlo
+      let nombre = "";
+      let apellido = apellidoCompleto;
+      
+      if (nombreCompleto && !apellidoCompleto) {
+        // Si todo está en nombres, separar por espacios
+        const partesNombre = nombreCompleto.trim().split(" ");
+        if (partesNombre.length >= 2) {
+          nombre = partesNombre[0]; // Primer nombre
+          apellido = partesNombre.slice(1).join(" "); // Resto como apellidos
+        } else {
+          nombre = nombreCompleto;
+        }
+      } else {
+        // Si ya están separados, usar tal como están
+        nombre = nombreCompleto;
+        apellido = apellidoCompleto;
+      }
+
       setFormulario((prev) => ({
         ...prev,
         titular: {
           ...prev.titular,
-          nombre: user.nombres || user.name || "",
-          apellido: user.apellidos || "",
+          nombre: nombre,
+          apellido: apellido,
           email: user.email || "",
           telefono: user.telefono || "",
           documento: user.documento_identidad || "",
           fecha_nacimiento: user.fecha_nacimiento || "",
-          // Si no hay nacionalidad específica, usar la ubicación del usuario o Bolivia por defecto
           nacionalidad: user.pais || "Boliviana",
         },
       }));
@@ -401,20 +444,33 @@ export default function FlujoReservaModerno({
 
   // Avanzar al siguiente paso
   const siguientePaso = () => {
+    console.log("🔄 Intentando avanzar desde paso:", pasoActual);
     let errores: string[] = [];
 
     switch (pasoActual) {
       case "titular":
         errores = validarTitular();
-        if (errores.length === 0) setPasoActual("acompanantes");
+        console.log("🔍 Errores titular:", errores.length);
+        if (errores.length === 0) {
+          console.log("✅ Avanzando a acompañantes");
+          setPasoActual("acompanantes");
+        }
         break;
       case "acompanantes":
         errores = validarAcompanantes();
-        if (errores.length === 0) setPasoActual("detalles");
+        console.log("🔍 Errores acompañantes:", errores.length);
+        if (errores.length === 0) {
+          console.log("✅ Avanzando a detalles");
+          setPasoActual("detalles");
+        }
         break;
       case "detalles":
         errores = validarDetalles();
-        if (errores.length === 0) setPasoActual("confirmacion");
+        console.log("🔍 Errores detalles:", errores.length);
+        if (errores.length === 0) {
+          console.log("✅ Avanzando a confirmación");
+          setPasoActual("confirmacion");
+        }
         break;
       case "confirmacion":
         // Este caso se maneja en enviarReserva
@@ -506,104 +562,112 @@ export default function FlujoReservaModerno({
     });
 
     try {
-      console.log("🔍 DETECTANDO TIPO DE SERVICIO/PAQUETE...");
-      const tipoDetectado = await detectarTipoServicio(formulario.servicio.id);
-
-      if (!tipoDetectado)
-        throw new Error("No se pudo determinar el tipo de servicio/paquete");
-
-      const cantidadPersonas = 1 + formulario.acompanantes.length;
-      let payloadReserva;
-
       // Obtener el ID del cliente autenticado
-      const clienteId =  1;
-
-      if (tipoDetectado.tipo === "paquete") {
-        const paqueteConPrecioCorrector = {
-          ...tipoDetectado.data,
-          precio: formulario.servicio.precio,
-        };
-        payloadReserva = await prepararReservaPaquete(
-          paqueteConPrecioCorrector,
-          cantidadPersonas,
-          clienteId
-        );
-      } else {
-        payloadReserva = prepararReservaServicio(
-          tipoDetectado.data,
-          cantidadPersonas,
-         clienteId
-        );
+      const clienteId = user?.id ? parseInt(user.id) : null;
+      
+      if (!clienteId) {
+        throw new Error("Usuario no autenticado o ID de usuario no válido");
       }
 
-      // Fecha y estado
-      const fechaServicio = new Date(
-        formulario.detalles.fecha_inicio + "T10:00:00Z"
-      );
-      payloadReserva.fecha_inicio = fechaServicio.toISOString();
-      payloadReserva.estado = "PENDIENTE";
+      console.log("🔍 PREPARANDO RESERVA PARA BACKEND DJANGO...");
 
-      // ✅ Agregar total y fecha reales
-  payloadReserva.total = String(calcularTotal()); // 💰 total calculado
-  // asignaciones opcionales: algunos tipos pueden no tener esos campos definidos en la interfaz
-  (payloadReserva as any).fecha = formulario.detalles.fecha_inicio; // 📅 fecha del viaje
+      // Preparar fechas en formato ISO
+      const fechaInicio = new Date(formulario.detalles.fecha_inicio + "T09:00:00Z");
+      const fechaFin = new Date(formulario.detalles.fecha_inicio + "T18:00:00Z");
 
-      // Actualizar fecha en detalles
-      if (payloadReserva.detalles) {
-        payloadReserva.detalles = payloadReserva.detalles.map(
-          (detalle: any) => ({
-            ...detalle,
-            fecha_servicio: fechaServicio.toISOString(),
-          })
-        );
-      }
+      // 🎯 PAYLOAD COMPATIBLE CON DJANGO BACKEND
+      const payloadReserva = {
+        fecha: formulario.detalles.fecha_inicio, // Fecha simple YYYY-MM-DD
+        fecha_inicio: fechaInicio.toISOString(), // Fecha y hora de inicio
+        fecha_fin: fechaFin.toISOString(), // Fecha y hora de fin
+        estado: "PENDIENTE",
+        total: calcularTotal().toFixed(2), // Total como string con 2 decimales
+        moneda: "BOB",
+        cliente_id: clienteId, // ✅ Corregido: debe ser cliente_id según el error
+        cupon: formulario.detalles.codigo_cupon.trim() 
+          ? parseInt(formulario.detalles.codigo_cupon.trim()) 
+          : null, // ✅ ID numérico del cupón, no código
+      };
 
-      // Acompañantes
-      payloadReserva.acompanantes = [
-        {
-          acompanante: {
-            documento: formulario.titular.documento,
-            nombre: formulario.titular.nombre,
-            apellido: formulario.titular.apellido,
-            fecha_nacimiento: formulario.titular.fecha_nacimiento,
-            nacionalidad: formulario.titular.nacionalidad,
-            email: formulario.titular.email,
-            telefono: formulario.titular.telefono,
-          },
-          estado: "CONFIRMADO",
-          es_titular: true,
-        },
-        ...formulario.acompanantes.map((acomp) => ({
-          acompanante: {
-            documento: acomp.documento,
+      console.log("📋 PAYLOAD DJANGO BACKEND:", JSON.stringify(payloadReserva, null, 2));
+
+      // 🚀 CREAR RESERVA EN EL BACKEND
+      const response = await crearReserva(payloadReserva);
+      
+      if (response.status === 201 && response.data) {
+        const reservaId = response.data.id;
+        setUltimaReservaId(reservaId);
+        console.log("✅ RESERVA CREADA CON ID:", reservaId);
+        // 👥 CREAR Y ASOCIAR VISITANTES (NUEVO FLUJO DJANGO)
+        console.log("👥 CREANDO VISITANTES...");
+        // 1. Crear visitante titular
+        const datosVisitanteTitular = convertirFormularioAVisitante(formulario.titular, true);
+        const visitanteTitular = await crearVisitante(datosVisitanteTitular);
+        // Al completar la reserva, avanzar al paso de pago
+        setPasoActual("pago");
+        setProcesandoReserva(false);
+        toast({
+          title: "Reserva creada",
+          description: "Ahora puede proceder al pago.",
+          variant: "default",
+          duration: 3000,
+        });
+        return;
+        
+        // 2. Asociar titular a reserva
+        try {
+          await asociarVisitanteReserva(reservaId, visitanteTitular.data.id);
+          console.log("✅ VISITANTE TITULAR CREADO Y ASOCIADO");
+        } catch (associationError) {
+          console.warn("⚠️ ERROR EN ASOCIACIÓN - CONTINUANDO CON RESERVA:");
+          console.warn("   Reserva ID:", reservaId);
+          console.warn("   Visitante ID:", visitanteTitular.data.id);
+          console.warn("   Error:", associationError);
+          console.log("✅ VISITANTE TITULAR CREADO (sin asociación automática)");
+        }
+
+        // 3. Crear y asociar acompañantes
+        for (let i = 0; i < formulario.acompanantes.length; i++) {
+          const acomp = formulario.acompanantes[i];
+          const datosVisitanteAcomp = convertirFormularioAVisitante({
             nombre: acomp.nombre,
             apellido: acomp.apellido,
+            documento: acomp.documento,
             fecha_nacimiento: acomp.fecha_nacimiento,
             nacionalidad: acomp.nacionalidad,
             email: acomp.email || formulario.titular.email,
             telefono: acomp.telefono || formulario.titular.telefono,
-          },
-          estado: "CONFIRMADO",
-          es_titular: false,
-        })),
-      ];
+          }, false);
+          
+          const visitanteAcomp = await crearVisitante(datosVisitanteAcomp);
+          
+          try {
+            await asociarVisitanteReserva(reservaId, visitanteAcomp.data.id);
+            console.log(`✅ ACOMPAÑANTE ${i + 1} CREADO Y ASOCIADO`);
+          } catch (associationError) {
+            console.warn(`⚠️ ERROR EN ASOCIACIÓN ACOMPAÑANTE ${i + 1} - CONTINUANDO:`);
+            console.warn("   Reserva ID:", reservaId);
+            console.warn("   Visitante ID:", visitanteAcomp.data.id);
+            console.log(`✅ ACOMPAÑANTE ${i + 1} CREADO (sin asociación automática)`);
+          }
+        }
 
-      // Cupón opcional
-      if (formulario.detalles.codigo_cupon.trim()) {
-        (payloadReserva as any).cupon_codigo = formulario.detalles.codigo_cupon.trim();
+        console.log("🎉 RESERVA Y VISITANTES COMPLETAMENTE PROCESADOS");
+        
+        const numeroReserva = response.data.id;
+        toast({
+          title: "¡Reserva creada exitosamente!",
+          description: `Su número de reserva es: #${numeroReserva}. Se han registrado ${1 + formulario.acompanantes.length} visitantes.`,
+          variant: "default",
+          duration: 6000,
+        });
+  // Abrir modal de pago ficticio en vez de redirigir directamente
+  // Eliminado: setModalPagoAbierto(true);
+  // Guardar el número de reserva para usarlo tras el pago
+  // Eliminado: window.__numeroReservaFinta = numeroReserva.toString();
+      } else {
+        throw new Error("Respuesta inesperada del servidor");
       }
-
-      // Notas opcionales
-      if (formulario.detalles.notas_adicionales.trim()) {
-        (payloadReserva as any).notas = formulario.detalles.notas_adicionales.trim();
-      }
-
-      console.log(
-        "📋 PAYLOAD FINAL CON PRECIOS CORRECTOS:",
-        JSON.stringify(payloadReserva, null, 2)
-      );
-
-      const response = await crearReserva(payloadReserva);
 
       if (response.status === 201 && response.data) {
         const numeroReserva = response.data.id || `BOL-${Date.now()}`;
@@ -613,7 +677,10 @@ export default function FlujoReservaModerno({
           variant: "default",
           duration: 6000,
         });
-        if (onReservaCompleta) onReservaCompleta(numeroReserva.toString());
+  // Abrir modal de pago ficticio en vez de redirigir directamente
+  // Eliminado: setModalPagoAbierto(true);
+  // Eliminado: window.__numeroReservaFinta = numeroReserva.toString();
+  // Modal de pago eliminado: ahora el pago es un paso del wizard
       } else {
         throw new Error("Respuesta inesperada del servidor");
       }
@@ -643,10 +710,39 @@ export default function FlujoReservaModerno({
         return renderizarPasoDetalles();
       case "confirmacion":
         return renderizarPasoConfirmacion();
+      case "pago":
+        return renderizarPasoPago();
       default:
         return null;
     }
   };
+
+
+  // Paso de pago con Stripe Checkout
+  const renderizarPasoPago = () => (
+    <Card>
+      <CardHeader className="text-center">
+        <div className="mx-auto w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mb-4">
+          <span className="text-2xl text-orange-600">💳</span>
+        </div>
+        <CardTitle className="text-xl">Pago con Stripe</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="text-center">
+          <p className="mb-4">Serás redirigido a Stripe para completar el pago de tu reserva.</p>
+          <p className="text-lg font-bold text-green-600 mb-4">Total a pagar: Bs. {calcularTotal().toFixed(2)}</p>
+          {ultimaReservaId ? (
+            <BotonStripeCheckout
+              monto={calcularTotal()}
+              descripcion={`Reserva #${ultimaReservaId} - ${servicioSeleccionado?.nombre || "Paquete"}`}
+            />
+          ) : (
+            <p className="text-red-600">No se encontró la reserva a pagar.</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   const renderizarPasoTitular = () => (
     <Card>
@@ -1216,6 +1312,24 @@ export default function FlujoReservaModerno({
             </div>
             <span className="ml-2 text-sm">Confirmación</span>
           </div>
+          <div
+            className={`flex items-center ${
+              pasoActual === "pago"
+                ? "text-orange-600"
+                : "text-gray-400"
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-medium ${
+                pasoActual === "pago"
+                  ? "border-orange-600 bg-orange-600 text-white"
+                  : "border-gray-300"
+              }`}
+            >
+              5
+            </div>
+            <span className="ml-2 text-sm">Pago</span>
+          </div>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2">
           <div
@@ -1223,11 +1337,13 @@ export default function FlujoReservaModerno({
             style={{
               width:
                 pasoActual === "titular"
-                  ? "25%"
+                  ? "20%"
                   : pasoActual === "acompanantes"
-                  ? "50%"
+                  ? "40%"
                   : pasoActual === "detalles"
-                  ? "75%"
+                  ? "60%"
+                  : pasoActual === "confirmacion"
+                  ? "80%"
                   : "100%",
             }}
           />
@@ -1247,20 +1363,20 @@ export default function FlujoReservaModerno({
           Volver a la vista previa
         </Button>
 
-        {pasoActual !== "confirmacion" ? (
-          <Button
-            onClick={siguientePaso}
-            className="bg-orange-600 hover:bg-orange-700"
-          >
-            Continuar
-          </Button>
-        ) : (
+        {pasoActual === "confirmacion" ? (
           <Button
             onClick={enviarReserva}
             disabled={procesandoReserva}
             className="bg-green-600 hover:bg-green-700"
           >
             {procesandoReserva ? "Procesando..." : "Confirmar Reserva"}
+          </Button>
+        ) : pasoActual === "pago" ? null : (
+          <Button
+            onClick={siguientePaso}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            Continuar
           </Button>
         )}
       </div>

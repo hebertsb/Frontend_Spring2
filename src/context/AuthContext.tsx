@@ -24,12 +24,11 @@ interface User {
   pais?: string;
 }
 
-// Mapeo de IDs de roles a nombres (según contrato del backend)
-// Backend informó: 1: Administrador, 2: Cliente, 3: Proveedor, 4: Soporte
-// Guardamos los nombres en minúsculas para comparaciones consistentes.
+// Mapeo de IDs de roles a nombres (según contrato del backend CORRECTO)
+// Backend confirmado: 1: Admin, 2: Cliente, 3: Proveedor, 4: Soporte
 const ROLE_MAP: Record<number, string> = {
   1: "administrador",
-  2: "cliente",
+  2: "cliente",    // CORRECTO: cliente es rol ID 2
   3: "proveedor",
   4: "soporte"
 };
@@ -153,23 +152,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("authToken");
       const storedUser = localStorage.getItem("user");
-      if (token) {
+      if (token && storedUser) {
         setAuthToken(token);
-        if (storedUser) {
-          try {
-            const parsed = JSON.parse(storedUser);
-            setUser(normalizeUser(parsed));
-            // We have a cached user and token — stop the global loading state.
-            setLoading(false);
-          } catch {
-            // If cached user is corrupted, attempt to fetch authoritative data
-            // and let reloadUser manage loading state.
-            reloadUser();
-          }
-        } else {
-          // If no stored user, attempt to refresh authoritative user data
+        try {
+          const parsed = JSON.parse(storedUser);
+          setUser(normalizeUser(parsed));
+          setLoading(false);
+        } catch {
           reloadUser();
         }
+      } else if (token) {
+        setAuthToken(token);
+        reloadUser();
       } else {
         setLoading(false);
       }
@@ -185,7 +179,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // apiLogin returns { token, user }
       const token = res.token || null;
       const userFromRes = res.user || null;
-      if (token) setAuthToken(token);
+      if (token && typeof window !== "undefined") {
+        localStorage.setItem("authToken", token);
+        setAuthToken(token);
+      }
       if (userFromRes && typeof window !== "undefined") {
         localStorage.setItem("user", JSON.stringify(userFromRes));
         try {
@@ -198,16 +195,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return { success: true };
     } catch (error: unknown) {
       // Limpiar tokens en caso de error de login
-      localStorage.removeItem("access");
-      localStorage.removeItem("refresh");
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("user");
+  localStorage.removeItem("access");
+  localStorage.removeItem("refresh");
       setUser(null);
       
       // Capturar diferentes tipos de errores del backend
       let message = "Credenciales inválidas";
       
       if (typeof error === "object" && error !== null) {
-        const err = error as { response?: { status?: number; data?: { message?: string; detail?: string } }, message?: string };
-        if (err.response?.status === 401) {
+        const err = error as { 
+          response?: { status?: number; data?: { message?: string; detail?: string } }, 
+          message?: string;
+          code?: string;
+        };
+        
+        // Error de conexión (backend no disponible)
+        if (err.code === "ERR_NETWORK" || err.code === "ECONNREFUSED" || err.message?.includes("Network Error")) {
+          message = "🔌 Backend no disponible. Asegúrate de que el servidor Django esté corriendo en http://localhost:8000";
+        } else if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
+          message = "⏰ Tiempo de espera agotado. El servidor no responde";
+        } else if (err.response?.status === 401) {
           message = "Email o contraseña incorrectos";
         } else if (err.response?.status === 403) {
           message = "Tu cuenta está bloqueada o inactiva";
@@ -224,6 +233,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
+      // Log de debug para desarrollador
+      console.error("🚨 Login Error Details:", {
+        errorType: (error as any)?.code || "unknown",
+        status: (error as any)?.response?.status,
+        message: (error as any)?.message,
+        baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      });
+      
       return { success: false, message };
     }
   };
@@ -238,9 +255,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("[Auth] logout failed:", err);
     }
 
-    // apiLogout() already clears token and cached user in localStorage via setAuthToken(null)
-    setUser(null);
-    router.push("/"); // Redirigir al inicio después del logout
+  // Limpiar token y usuario de localStorage
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("user");
+  setUser(null);
+  router.push("/"); // Redirigir al inicio después del logout
   };
 
   // TokenAuth does not provide refresh by default. If refresh is implemented, keep logic here.

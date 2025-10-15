@@ -32,7 +32,8 @@ export default function ProtectedRoute({
       if (allowedRoles.length > 0 && user) {
         const hasPermission = allowedRoles.some(roleId => {
           const userRoleStr = String(user.role || "").toLowerCase();
-          return user.roles?.includes(roleId) || userRoleStr === getRoleName(roleId);
+          const roleName = getRoleName(roleId);
+          return user.roles?.includes(roleId) || userRoleStr === roleName;
         });
         
         if (!hasPermission) {
@@ -47,7 +48,7 @@ export default function ProtectedRoute({
   const getRoleName = (roleId: number): string => {
     const roleMap: Record<number, string> = {
       1: "administrador",
-      2: "cliente",
+      2: "cliente",    // CORRECTO: cliente es rol ID 2
       3: "proveedor",
       4: "soporte"
     };

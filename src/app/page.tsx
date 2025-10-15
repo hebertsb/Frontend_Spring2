@@ -4,7 +4,6 @@ import { DestinosDestacados } from "@/components/inicio/destinos-destacados";
 import { PiePagina } from "@/components/comunes/pie-pagina";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
-import ChatTurismo from "@/components/chatbot";
 export default function PaginaInicio() {
   return (
     <div className="min-h-screen w-full">

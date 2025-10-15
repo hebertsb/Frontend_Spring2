@@ -45,3 +45,57 @@ next-env.d.ts
 
 # Ignore markdown files
 *.md
+
+# Carpeta de pruebas
+pruebas/
+
+# Archivos de test
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.js
+*.spec.ts
+*.spec.tsx
+test_*.js
+test_*.ts
+test_*.tsx
+manual_test_*
+
+# Documentación y archivos no de código
+*.MD
+*.markdown
+*.pdf
+*.doc*
+*.xls*
+
+# Otros archivos de datos temporales
+*.sqlite
+*.db
+*.csv
+*.zip
+*.tar.gz
+
+# Imágenes y multimedia temporales
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.mov
+*.webm
+*.avi
+*.mkv
+
+# Archivos de respaldo de IDE
+*.sublime-workspace
+*.sublime-project
+
+# Archivos de configuración personales
+*.local.js
+*.local.ts
+*.local.json
+
+# Archivos de backup
+*.bak
+*.tmp
+*~

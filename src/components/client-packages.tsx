@@ -1,102 +1,84 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { CalendarDays, Users, Clock, MapPin } from 'lucide-react'
-
-interface Package {
-  id: string
-  nombre: string
-  destino: string
-  tipo: string
-  duracion: number
-  precio: number
-  fechaCompra: string
-  fechaInicio: string
-  fechaFin: string
-  estado: 'activo' | 'finalizado' | 'pendiente' | 'cancelado'
-  participantes: number
-  imagen: string
-  descripcion: string
-}
-
-// Mock data - reemplazar con llamada al backend
-const mockPackages: Package[] = [
-  {
-    id: '1',
-    nombre: 'Tour Salar de Uyuni 3 días',
-    destino: 'Salar de Uyuni',
-    tipo: 'Aventura',
-    duracion: 3,
-    precio: 450,
-    fechaCompra: '2024-01-15',
-    fechaInicio: '2024-02-01',
-    fechaFin: '2024-02-03',
-    estado: 'finalizado',
-    participantes: 2,
-    imagen: '/salar-de-uyuni-espejo.png',
-    descripcion: 'Increíble experiencia de 3 días por el Salar de Uyuni con hotel de sal incluido.'
-  },
-  {
-    id: '2',
-    nombre: 'Lago Titicaca y Copacabana',
-    destino: 'Lago Titicaca',
-    tipo: 'Cultural',
-    duracion: 2,
-    precio: 280,
-    fechaCompra: '2024-03-20',
-    fechaInicio: '2024-04-10',
-    fechaFin: '2024-04-11',
-    estado: 'activo',
-    participantes: 1,
-    imagen: '/lago-titicaca-bolivia-panorama.png',
-    descripcion: 'Tour cultural por el Lago Titicaca visitando Copacabana e Isla del Sol.'
-  },
-  {
-    id: '3',
-    nombre: 'Amazonía Madidi 5 días',
-    destino: 'Parque Nacional Madidi',
-    tipo: 'Ecoturismo',
-    duracion: 5,
-    precio: 680,
-    fechaCompra: '2024-04-05',
-    fechaInicio: '2024-05-15',
-    fechaFin: '2024-05-19',
-    estado: 'pendiente',
-    participantes: 3,
-    imagen: '/madidi-amazon-rainforest.png',
-    descripcion: 'Expedición de 5 días por la Amazonía boliviana con lodge ecológico.'
-  }
-]
+import { CalendarDays, Users, Clock, MapPin, RefreshCw, Calendar } from 'lucide-react'
+import { obtenerMisReservas, ReservaCliente } from '@/api/cliente-panel'
+import { useToast } from '@/hooks/use-toast'
+import useAuth from '@/hooks/useAuth'
 
 const getStatusColor = (estado: string) => {
   switch (estado) {
-    case 'activo': return 'bg-green-100 text-green-800'
-    case 'finalizado': return 'bg-blue-100 text-blue-800'
-    case 'pendiente': return 'bg-yellow-100 text-yellow-800'
-    case 'cancelado': return 'bg-red-100 text-red-800'
+    case 'confirmado': return 'bg-green-100 text-green-800'
+    case 'en_curso': return 'bg-blue-100 text-blue-800'
+    case 'proximo': return 'bg-yellow-100 text-yellow-800'
+    case 'completado': return 'bg-purple-100 text-purple-800'
     default: return 'bg-gray-100 text-gray-800'
   }
 }
 
 const getStatusText = (estado: string) => {
   switch (estado) {
-    case 'activo': return 'En Curso'
-    case 'finalizado': return 'Finalizado'
-    case 'pendiente': return 'Próximo'
-    case 'cancelado': return 'Cancelado'
+    case 'confirmado': return 'Confirmado'
+    case 'en_curso': return 'En Curso'
+    case 'proximo': return 'Próximo'
+    case 'completado': return 'Completado'
     default: return estado
   }
 }
 
 export default function ClientPackages() {
-  const [packages, setPackages] = useState<Package[]>(mockPackages)
-  const [filteredPackages, setFilteredPackages] = useState<Package[]>(mockPackages)
+  const router = useRouter();
+  const [packages, setPackages] = useState<ReservaCliente[]>([])
+  const [filteredPackages, setFilteredPackages] = useState<ReservaCliente[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
+  const [loading, setLoading] = useState(true)
+  
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  // Cargar reservas y filtrar solo activos
+  const cargarPaquetes = async () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Debes estar autenticado para ver tus paquetes",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      setLoading(true);
+  const reservas = await obtenerMisReservas();
+  // Filtrar solo activos
+  const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
+  setPackages(activos || []);
+      if (activos && activos.length > 0) {
+        toast({
+          title: "✅ Paquetes activos cargados",
+          description: `Se encontraron ${activos.length} paquetes activos`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error cargando paquetes:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar tus paquetes",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarPaquetes();
+  }, [user]);
 
   useEffect(() => {
     let filtered = packages
@@ -104,15 +86,13 @@ export default function ClientPackages() {
     // Filtrar por término de búsqueda
     if (searchTerm) {
       filtered = filtered.filter(pkg =>
-        pkg.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pkg.destino.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        pkg.tipo.toLowerCase().includes(searchTerm.toLowerCase())
+        (pkg.paquete?.nombre || '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     // Filtrar por estado
     if (statusFilter !== 'todos') {
-      filtered = filtered.filter(pkg => pkg.estado === statusFilter)
+      filtered = filtered.filter(pkg => pkg.estado === statusFilter.toUpperCase());
     }
 
     setFilteredPackages(filtered)
@@ -160,16 +140,24 @@ export default function ClientPackages() {
             className="w-full h-10 px-3 py-2 border border-input bg-background rounded-md text-sm"
           >
             <option value="todos">Todos los estados</option>
-            <option value="activo">En Curso</option>
-            <option value="pendiente">Próximos</option>
-            <option value="finalizado">Finalizados</option>
-            <option value="cancelado">Cancelados</option>
+            <option value="en_curso">En Curso</option>
+            <option value="confirmado">Confirmados</option>
+            <option value="proximo">Próximos</option>
+            <option value="completado">Completados</option>
           </select>
         </div>
       </div>
 
       {/* Lista de Paquetes */}
-      {filteredPackages.length === 0 ? (
+      {loading ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <RefreshCw className="h-8 w-8 animate-spin mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Cargando paquetes</h3>
+            <p className="text-muted-foreground">Por favor espera...</p>
+          </CardContent>
+        </Card>
+      ) : filteredPackages.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-4xl mb-4">📦</div>
@@ -188,22 +176,42 @@ export default function ClientPackages() {
             <Card key={pkg.id} className="overflow-hidden">
               {/* Imagen */}
               <div className="aspect-video relative overflow-hidden">
+                {/* Imagen no disponible en reservas, usar placeholder */}
                 <img
-                  src={pkg.imagen}
-                  alt={pkg.nombre}
+                  src={(() => {
+                    // Si el paquete tiene imagen, úsala
+                    if (pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen) {
+                      return pkg.paquete.imagen;
+                    }
+                    // Buscar imagen de ejemplo por id (convertir ambos a string para comparar)
+                    const idPaquete = pkg.paquete?.id ? String(pkg.paquete.id) : String(pkg.id);
+                    // Si no hay, usar placeholder
+                    return '/paquete-placeholder.png';
+                  })() as string}
+                  alt={pkg.paquete?.nombre || 'Paquete'}
                   className="w-full h-full object-cover transition-transform hover:scale-105"
                 />
+                  {/* Imagen de paquete o placeholder */}
+                  <img
+                    src={
+                      pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen
+                        ? pkg.paquete.imagen
+                        : '/img/paquete-placeholder.jpg'
+                    }
+                    alt={pkg.paquete?.nombre || 'Paquete turístico'}
+                    className="object-cover w-full h-full"
+                  />
                 <div className="absolute top-2 right-2">
-                  <Badge className={getStatusColor(pkg.estado)}>
-                    {getStatusText(pkg.estado)}
+                  <Badge className={getStatusColor(pkg.estado.toLowerCase())}>
+                    {getStatusText(pkg.estado.toLowerCase())}
                   </Badge>
                 </div>
               </div>
 
               <CardHeader>
                 <div className="space-y-1">
-                  <CardTitle className="text-lg">{pkg.nombre}</CardTitle>
-                  <CardDescription>{pkg.descripcion}</CardDescription>
+                  <CardTitle className="text-lg">{pkg.paquete?.nombre || 'Paquete'}</CardTitle>
+                  <CardDescription>{pkg.paquete && 'descripcion' in pkg.paquete ? (pkg.paquete as any).descripcion : ''}</CardDescription>
                 </div>
               </CardHeader>
 
@@ -212,19 +220,19 @@ export default function ClientPackages() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />
-                    <span>{pkg.destino}</span>
+                    <span>{pkg.paquete && 'destino' in pkg.paquete ? (pkg.paquete as any).destino : '-'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    <span>{pkg.duracion} días</span>
+                    <span>{('duracion' in pkg) ? (pkg as any).duracion : '-'} días</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="h-4 w-4" />
-                    <span>{pkg.participantes} participante{pkg.participantes > 1 ? 's' : ''}</span>
+                    <span>{pkg.numero_personas || 1} participante{(pkg.numero_personas || 1) > 1 ? 's' : ''}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <CalendarDays className="h-4 w-4" />
-                    <span>{formatDate(pkg.fechaInicio)} - {formatDate(pkg.fechaFin)}</span>
+                    <span>{formatDate(pkg.fecha_inicio || pkg.fecha || '')} - {formatDate(pkg.fecha_fin || pkg.fecha || '')}</span>
                   </div>
                 </div>
 
@@ -232,25 +240,45 @@ export default function ClientPackages() {
                 <div className="pt-2 border-t">
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="text-lg font-bold">{formatPrice(pkg.precio)}</div>
+                      <div className="text-lg font-bold">{formatPrice(pkg.total)}</div>
                       <div className="text-xs text-muted-foreground">
-                        Comprado el {formatDate(pkg.fechaCompra)}
+                        Comprado el {formatDate(pkg.created_at)}
                       </div>
                     </div>
                     <Badge variant="outline">
-                      {pkg.tipo}
+                      {pkg.paquete && 'tipo' in pkg.paquete ? (pkg.paquete as any).tipo : '-'}
                     </Badge>
                   </div>
                 </div>
 
                 {/* Acciones */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (pkg.id) {
+                        router.push(`/reservas/${pkg.id}`);
+                      }
+                    }}
+                    disabled={!pkg.id}
+                  >
                     Ver Detalles
                   </Button>
-                  {pkg.estado === 'activo' && (
-                    <Button size="sm" className="flex-1">
-                      Gestionar
+                  {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
+                  {pkg.estado === 'PAGADA' && (
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-orange-600 hover:bg-orange-700"
+                      onClick={() => {
+                        if (pkg.id) {
+                          router.push(`/reservas/${pkg.id}?reprogramar=1`);
+                        }
+                      }}
+                    >
+                      <Calendar className="w-4 h-4 mr-1" />
+                      Reprogramar
                     </Button>
                   )}
                 </div>
@@ -271,7 +299,7 @@ export default function ClientPackages() {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-green-600">
-              {packages.filter(p => p.estado === 'activo').length}
+              {packages.filter(p => p.estado === 'en_curso').length}
             </div>
             <div className="text-sm text-muted-foreground">En Curso</div>
           </CardContent>
@@ -279,15 +307,15 @@ export default function ClientPackages() {
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-yellow-600">
-              {packages.filter(p => p.estado === 'pendiente').length}
+              {packages.filter(p => p.estado === 'confirmado').length}
             </div>
-            <div className="text-sm text-muted-foreground">Próximos</div>
+            <div className="text-sm text-muted-foreground">Confirmados</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600">
-              {packages.filter(p => p.estado === 'finalizado').length}
+              {packages.filter(p => p.estado === 'completado').length}
             </div>
             <div className="text-sm text-muted-foreground">Completados</div>
           </CardContent>
