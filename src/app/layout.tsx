@@ -7,6 +7,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { LoadingLinkProvider } from "@/components/EfectoCarga/contexto";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import HydrationFix from "@/components/HydrationFix";
+import ChatTurismo from "@/components/chatbot";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -29,9 +30,16 @@ export const metadata: Metadata = {
   generator: "v0.app",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="es" className={`${montserrat.variable} ${openSans.variable} h-full`}>
+    <html
+      lang="es"
+      className={`${montserrat.variable} ${openSans.variable} h-full`}
+    >
       <body className="font-sans antialiased min-h-screen w-full overflow-x-hidden overflow-y-auto">
         <HydrationFix />
         <LoadingLinkProvider>
@@ -41,6 +49,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Toaster />
                 {children}
               </div>
+
+              <ChatTurismo />
             </SidebarProvider>
           </AuthProvider>
         </LoadingLinkProvider>
