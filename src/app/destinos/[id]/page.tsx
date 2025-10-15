@@ -25,24 +25,21 @@ export default async function Page({ params }: { params: { id: string } }) {
 
   try {
     console.log("🔍 Buscando destino con ID:", params.id);
-    // Fetch de datos del destino
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/${params.id}`, { 
-      cache: "no-store",
+    // Fetch de datos del destino con ISR (revalidación cada 60 segundos)
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/servicios/${params.id}`, {
+      next: { revalidate: 60 },
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
     });
-    
     if (!res.ok) {
       throw new Error(`HTTP error! status: ${res.status}`);
     }
-    
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
       throw new Error("La respuesta no es JSON válido");
     }
-    
     destino = await res.json();
     console.log("✅ Destino encontrado:", destino?.titulo);
   } catch (err) {

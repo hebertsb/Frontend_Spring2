@@ -1,9 +1,11 @@
+"use client";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
-import axios from "../api/axios";
+import axios from "@/api/axios";
+import type { AxiosResponse } from "axios";
 
 export default function ConfirmacionPago() {
   const router = useRouter();
@@ -20,7 +22,7 @@ export default function ConfirmacionPago() {
     }
     // Consultar el estado de la reserva
     axios.get(`reservas/${reservaId}/`)
-      .then(res => {
+      .then((res: AxiosResponse<any>) => {
         const estadoReserva = res.data.estado;
         if (["PAGADA", "CONFIRMADA"].includes(estadoReserva)) {
           setEstado("exito");

@@ -44,8 +44,8 @@ export default function ChatTurismo() {
   const enviar = async () => {
     if (!pregunta.trim()) return;
 
-    const nuevoMensaje = { tipo: "user", texto: pregunta };
-    setMensajes((prev) => [...prev, nuevoMensaje]);
+  const nuevoMensaje: { tipo: "user" | "bot"; texto: string } = { tipo: "user", texto: pregunta };
+  setMensajes((prev) => [...prev, nuevoMensaje]);
     setPregunta("");
     setCargando(true);
 
