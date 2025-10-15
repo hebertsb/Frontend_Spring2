@@ -1,6 +1,5 @@
 "use client"
 
-
 import { SiteHeader } from "@/components/site-header"
 import {
   SidebarInset,
@@ -8,8 +7,6 @@ import {
 } from "@/components/ui/sidebar"
 import { useSearchParams } from "next/navigation"
 import ProtectedRoute from "@/components/ProtectedRoute"
-
-
 import ClientDashboard from "@/components/client-dashboard"
 import ClientReservations from "@/components/client-reservations"
 import ClientPurchaseHistory from "@/components/client-purchase-history"
@@ -36,7 +33,7 @@ export default function ClientPage() {
 
   return (
     <ProtectedRoute 
-      allowedRoles={[3]} // Solo cliente (rol ID 3)
+      allowedRoles={[2]} // Solo cliente (rol ID 2) - CORREGIDO
       requireAuth={true}
       redirectTo="/"
     >

@@ -51,15 +51,15 @@ export function Navegacion() {
               const isAdmin = user?.roles?.includes(1) || roleStr === "administrador";
               // Verificar si el usuario es soporte (rol 4 o rol "soporte")  
               const isSupport = user?.roles?.includes(4) || roleStr === "soporte";
-              // Verificar si el usuario es cliente (rol 3 o rol "cliente")
-              const isClient = user?.roles?.includes(3) || roleStr === "cliente";
+              // Verificar si el usuario es cliente (rol 2 o rol "cliente")
+              const isClient = user?.roles?.includes(2) || roleStr === "cliente";
               
               if (isAdmin) {
                 return <LoadingLink href="/panel">Panel Admin</LoadingLink>;
               } else if (isSupport) {
                 return <LoadingLink href="/panel">Panel Soporte</LoadingLink>;
               } else if (isClient) {
-                return <LoadingLink href="/cliente">Mi Panel</LoadingLink>;
+                return <LoadingLink href="/cliente?tab=reservas">Mi Panel</LoadingLink>;
               }
               return null;
             })()}
@@ -117,8 +117,8 @@ export function Navegacion() {
                 const isAdmin = user?.roles?.includes(1) || roleStrMobile === "administrador";
                 // Verificar si el usuario es soporte (rol 4 o rol "soporte")
                 const isSupport = user?.roles?.includes(4) || roleStrMobile === "soporte";
-                // Verificar si el usuario es cliente (rol 3 o rol "cliente")
-                const isClient = user?.roles?.includes(3) || roleStrMobile === "cliente";
+                // Verificar si el usuario es cliente (rol 2 o rol "cliente")
+                const isClient = user?.roles?.includes(2) || roleStrMobile === "cliente";
                 
                 if (isAdmin) {
                   return (
@@ -134,7 +134,7 @@ export function Navegacion() {
                   );
                 } else if (isClient) {
                   return (
-                    <LoadingLink href="/cliente" className="block px-3 py-2">
+                    <LoadingLink href="/cliente?tab=reservas" className="block px-3 py-2">
                       Mi Panel
                     </LoadingLink>
                   );

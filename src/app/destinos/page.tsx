@@ -71,40 +71,55 @@ export default function PaginaDestinos() {
   };
 
   /**
-   * 📡 Fetch de servicios desde la API (con fallback en caso de error)
+   * 📡 Fetch de destinos individuales desde la NUEVA API
    */
   useEffect(() => {
     const fetchServicios = async () => {
       setCargando(true);
       try {
-        console.log("🌍 Intentando cargar servicios desde API...");
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/servicios/`,
-          {
-            cache: "no-store",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          }
+        console.log("�️ Cargando DESTINOS INDIVIDUALES desde nueva API...");
+        
+        // Importar la nueva API
+        const { obtenerDestinosIndividuales } = await import('@/api/paquetes');
+        
+        // Obtener destinos individuales activos
+        const response = await obtenerDestinosIndividuales({ estado: 'Activo' });
+        console.log('✅ Destinos individuales obtenidos:', response);
+        
+        // Validar que tengamos resultados
+        if (!response.results || !Array.isArray(response.results)) {
+          console.warn('⚠️ No se obtuvieron resultados válidos, usando datos mock');
+          setServicios(serviciosFallback);
+          return;
+        }
+        
+        // Convertir al formato esperado por el frontend
+        const destinosAdaptados: Servicio[] = response.results.map((destino: any) => 
+          adaptarServicio({
+            id: destino.id,
+            titulo: destino.titulo,
+            precio_usd: destino.precio_usd,
+            categoria: destino.categoria?.nombre || 'Turismo',
+            duracion: destino.duracion,
+            descripcion: destino.descripcion,
+            servicios_incluidos: destino.servicios_incluidos,
+            estado: destino.estado,
+            imagen_url: destino.imagen_url,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as Servicio)
         );
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const contentType = response.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("La respuesta no es JSON válido");
-        }
-
-        const data = await response.json();
-        console.log(`✅ Servicios cargados desde API: ${data.length} elementos`);
-
-        const serviciosAdaptados = data.map((item: any) => adaptarServicio(item));
-        setServicios(serviciosAdaptados);
+        
+        setServicios(destinosAdaptados);
+        console.log('✅ Destinos adaptados correctamente:', destinosAdaptados.length);
+        
       } catch (error) {
-        console.warn("⚠️ Error al cargar servicios desde API, usando fallback:", error);
+        console.error("❌ Error cargando destinos individuales:", error);
+        
+        // Fallback a datos mock si falla la nueva API
+        console.log("🔄 Usando datos mock como fallback...");
         setServicios(serviciosFallback);
+        
       } finally {
         setCargando(false);
       }

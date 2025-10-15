@@ -33,7 +33,27 @@ export default function PaginaReserva() {
 
     // ✅ Intentar con datos de URL primero
     if (nombre && precioParam) {
-      const precio = parseFloat(precioParam.replace(/[^\d.,]/g, "").replace(",", "."));
+      console.log("💰 Precio recibido desde URL:", precioParam);
+      
+      // Limpiar y convertir precio correctamente
+      let precioLimpio = precioParam;
+      
+      // Si viene como "Bs. 500" o "Bs.500", extraer solo el número
+      if (precioParam.includes("Bs.") || precioParam.includes("Bs ")) {
+        precioLimpio = precioParam.replace(/Bs\.?\s*/i, "").trim();
+      }
+      
+      // Remover cualquier caracter que no sea número, punto o coma
+      precioLimpio = precioLimpio.replace(/[^\d.,]/g, "");
+      
+      // Reemplazar coma por punto para parsing
+      precioLimpio = precioLimpio.replace(",", ".");
+      
+      const precio = parseFloat(precioLimpio);
+      
+      console.log("💰 Precio limpio extraído:", precioLimpio);
+      console.log("💰 Precio parseado:", precio);
+      
       setServicio({ id, nombre, precio: isNaN(precio) ? 0 : precio });
       setCargando(false);
       return;

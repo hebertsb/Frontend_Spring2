@@ -126,3 +126,173 @@ export const editarReserva = async (id: string, data: any) => {
 
 // Eliminar una reserva
 export const eliminarReserva = (id: string) => axios.delete(`/reservas/${id}/`);
+
+// ============================================
+// 🎯 APIS ESPECÍFICAS PARA CLIENTES
+// ============================================
+
+// Interfaz para las estadísticas de reservas
+export interface EstadisticasReservas {
+  total_reservas: number;
+  por_estado: {
+    PENDIENTE: number;
+    CONFIRMADA: number;
+    PAGADA: number;
+    CANCELADA: number;
+    COMPLETADA: number;
+    REPROGRAMADA: number;
+  };
+}
+
+// Interfaz para la respuesta de mis reservas
+export interface MisReservasResponse {
+  estadisticas: EstadisticasReservas;
+  reservas: any[]; // Usar la interfaz Reserva existente si está definida
+}
+
+// 1. Obtener todas las reservas del cliente autenticado con estadísticas
+export const obtenerMisReservasCompletas = async (filtros: any = {}): Promise<MisReservasResponse> => {
+  try {
+    console.log('🔄 API: Obteniendo mis reservas completas con filtros:', filtros);
+    
+    // Intentar usar la API específica primero
+    try {
+      // Construir parámetros de query
+      const params = new URLSearchParams();
+      Object.keys(filtros).forEach(key => {
+        if (filtros[key]) {
+          params.append(key, filtros[key]);
+        }
+      });
+      
+      const response = await axios.get(`reservas/mis_reservas/?${params.toString()}`);
+      
+      console.log('✅ API: Mis reservas obtenidas exitosamente (API específica)');
+      console.log('📊 API: Estadísticas:', response.data.estadisticas);
+      console.log('📋 API: Reservas:', response.data.reservas?.length || 0, 'reservas encontradas');
+      
+      return response.data;
+    } catch (apiError: any) {
+      console.log('⚠️ API específica no disponible, usando fallback:', apiError.response?.status);
+      
+      // Fallback: usar la API general y filtrar manualmente
+      console.log('🔄 API: Usando API general como fallback...');
+      const response = await axios.get('reservas/', { timeout: 30000 });
+      
+      if (response && response.data && Array.isArray(response.data)) {
+        // Simular la estructura de respuesta esperada
+        const reservas = response.data;
+        
+        // Calcular estadísticas manualmente
+        const estadisticas = {
+          total_reservas: reservas.length,
+          por_estado: {
+            PENDIENTE: reservas.filter(r => r.estado?.toUpperCase() === 'PENDIENTE').length,
+            CONFIRMADA: reservas.filter(r => r.estado?.toUpperCase() === 'CONFIRMADA').length,
+            PAGADA: reservas.filter(r => r.estado?.toUpperCase() === 'PAGADA').length,
+            CANCELADA: reservas.filter(r => r.estado?.toUpperCase() === 'CANCELADA').length,
+            COMPLETADA: reservas.filter(r => r.estado?.toUpperCase() === 'COMPLETADA').length,
+            REPROGRAMADA: reservas.filter(r => r.estado?.toUpperCase() === 'REPROGRAMADA').length,
+          }
+        };
+        
+        console.log('✅ API: Fallback exitoso');
+        console.log('📊 API: Estadísticas calculadas:', estadisticas);
+        console.log('📋 API: Reservas encontradas:', reservas.length);
+        
+        return {
+          estadisticas,
+          reservas
+        };
+      } else {
+        throw new Error('Respuesta inválida de la API de fallback');
+      }
+    }
+  } catch (error: any) {
+    console.error('❌ API: Error al obtener mis reservas:', error);
+    console.error('❌ API: Response:', error.response?.data);
+    
+    // Como último recurso, devolver estructura vacía
+    return {
+      estadisticas: {
+        total_reservas: 0,
+        por_estado: {
+          PENDIENTE: 0,
+          CONFIRMADA: 0,
+          PAGADA: 0,
+          CANCELADA: 0,
+          COMPLETADA: 0,
+          REPROGRAMADA: 0,
+        }
+      },
+      reservas: []
+    };
+  }
+};
+
+// 2. Obtener solo las reservas activas del cliente
+export const obtenerReservasActivas = async () => {
+  try {
+    console.log('🔄 API: Obteniendo reservas activas del cliente');
+    
+    const response = await axios.get('reservas/reservas_activas/');
+    
+    console.log('✅ API: Reservas activas obtenidas:', response.data.count || 0);
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ API: Error al obtener reservas activas:', error);
+    throw error;
+  }
+};
+
+// 3. Obtener historial completo con reprogramaciones
+export const obtenerHistorialCompleto = async () => {
+  try {
+    console.log('🔄 API: Obteniendo historial completo de reservas');
+    
+    const response = await axios.get('reservas/historial_completo/');
+    
+    console.log('✅ API: Historial completo obtenido:', response.data.count || 0);
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ API: Error al obtener historial completo:', error);
+    throw error;
+  }
+};
+
+// 4. Obtener detalle específico de una reserva
+export const obtenerDetalleReserva = async (id: number | string) => {
+  try {
+    console.log('🔄 API: Obteniendo detalle de reserva ID:', id);
+    
+    const response = await axios.get(`reservas/${id}/`);
+    
+    console.log('✅ API: Detalle de reserva obtenido');
+    console.log('📋 API: Reserva:', response.data);
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ API: Error al obtener detalle de reserva:', error);
+    throw error;
+  }
+};
+
+// 5. Cancelar una reserva específica
+export const cancelarReserva = async (id: number | string) => {
+  try {
+    console.log('🔄 API: Cancelando reserva ID:', id);
+    
+    const response = await axios.patch(`reservas/${id}/`, {
+      estado: 'CANCELADA'
+    });
+    
+    console.log('✅ API: Reserva cancelada exitosamente');
+    
+    return response.data;
+  } catch (error: any) {
+    console.error('❌ API: Error al cancelar reserva:', error);
+    throw error;
+  }
+};

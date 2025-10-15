@@ -21,10 +21,10 @@ const api = axios.create({
 export function setAuthToken(token: string | null) {
   if (token) {
     api.defaults.headers.common["Authorization"] = `Token ${token}`;
-    if (typeof window !== "undefined") localStorage.setItem("authToken", token);
+    // Ya no guardar automáticamente en localStorage aquí
   } else {
     delete api.defaults.headers.common["Authorization"];
-    if (typeof window !== "undefined") localStorage.removeItem("authToken");
+    // Ya no eliminar automáticamente en localStorage aquí
   }
 }
 
@@ -42,11 +42,19 @@ api.interceptors.request.use((config) => {
   console.log('🌐 AXIOS: Método:', config.method?.toUpperCase());
   
   if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken");
-    if (token) {
-      console.log('🔐 AXIOS: Enviando token:', token.substring(0, 50) + '...');
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Token ${token}`;
+    // Excepción: no enviar token en endpoints públicos como 'provisional-pagar'
+    if (config.url && config.url.includes('provisional-pagar')) {
+      if (config.headers && config.headers.Authorization) {
+        delete config.headers.Authorization;
+      }
+      console.log('🔓 AXIOS: NO se envía token en endpoint provisional-pagar');
+    } else {
+      const token = localStorage.getItem("authToken");
+      if (token) {
+        console.log('🔐 AXIOS: Enviando token:', token.substring(0, 50) + '...');
+        config.headers = config.headers || {};
+        config.headers.Authorization = `Token ${token}`;
+      }
     }
   }
   

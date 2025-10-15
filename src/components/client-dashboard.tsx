@@ -1,7 +1,13 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import { getUser, updateUserProfile, UpdateUserData } from "@/api/auth";
+import { obtenerPerfilCompleto, PerfilCompleto } from "@/api/cliente-panel";
 import { useToast } from "@/hooks/use-toast";
+
+// Función auxiliar para formatear el total gastado
+const formatearTotalGastado = (total: number): string => {
+  return `Bs ${total.toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 
 const ClientDashboard = () => {
   const [user, setUser] = useState({
@@ -14,6 +20,7 @@ const ClientDashboard = () => {
     documento_identidad: "",
     pais: ""
   });
+  const [perfilUsuario, setPerfilUsuario] = useState<PerfilCompleto | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -35,8 +42,8 @@ const ClientDashboard = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
+        // Cargar datos básicos del usuario (para edición)
         const response = await getUser();
-        // Asegurar que todos los campos tengan valores válidos
         const userData = {
           nombres: response.data.nombres || "",
           apellidos: response.data.apellidos || "",
@@ -48,6 +55,16 @@ const ClientDashboard = () => {
           pais: response.data.pais || ""
         };
         setUser(userData);
+
+        // Cargar perfil completo del usuario (para estadísticas y visualización)
+        try {
+          const perfil = await obtenerPerfilCompleto();
+          setPerfilUsuario(perfil);
+          console.log('✅ Perfil de usuario cargado:', perfil);
+        } catch (perfilError) {
+          console.log('⚠️ No se pudo cargar el perfil completo, usando datos básicos');
+          console.error('Error del perfil:', perfilError);
+        }
       } catch (error) {
         console.error("Error al cargar datos del usuario:", error);
         toast({
@@ -114,8 +131,76 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div className="max-w-xl mx-auto mt-10 bg-white rounded-xl shadow p-6">
-      <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">Mi Perfil</h2>
+    <div className="space-y-6">
+      {/* Estadísticas del Usuario */}
+      {perfilUsuario && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-blue-100 text-sm">Total Reservas</p>
+                <p className="text-3xl font-bold">{perfilUsuario.total_reservas}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-green-100 text-sm">Reservas Activas</p>
+                <p className="text-3xl font-bold">{perfilUsuario.reservas_activas}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-xl shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-purple-100 text-sm">Total Gastado</p>
+                <p className="text-3xl font-bold">{formatearTotalGastado(perfilUsuario.total_gastado)}</p>
+              </div>
+              <div className="bg-white bg-opacity-20 p-3 rounded-full">
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Información del Usuario */}
+      {perfilUsuario && (
+        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-xl shadow-sm mb-6">
+          <div className="flex items-center space-x-4">
+            <div className="bg-indigo-500 text-white p-3 rounded-full">
+              <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">¡Hola, {perfilUsuario.nombre}!</h3>
+              <p className="text-gray-600">Rol: {perfilUsuario.rol.nombre}</p>
+              <p className="text-gray-600">Email: {perfilUsuario.email}</p>
+              <p className="text-gray-600">Miembro desde: {new Date(perfilUsuario.fecha_registro).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Formulario de Edición */}
+      <div className="max-w-xl mx-auto bg-white rounded-xl shadow p-6">
+        <h2 className="text-2xl font-bold text-blue-700 mb-6 text-center">Mi Perfil</h2>
       <form onSubmit={handleSave} className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-1">Nombres</label>
@@ -254,6 +339,7 @@ const ClientDashboard = () => {
           Cambiar contraseña
         </a>
       </div>
+    </div>
     </div>
   );
 };

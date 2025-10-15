@@ -7,6 +7,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { LoadingLinkProvider } from "@/components/EfectoCarga/contexto";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import HydrationFix from "@/components/HydrationFix";
+import { BackendStatus } from "@/components/backend-status";
 
 const montserrat = Montserrat({
   subsets: ["latin"],
@@ -38,6 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AuthProvider>
             <SidebarProvider>
               <div className="min-h-screen w-full overflow-y-auto">
+                {/* <BackendStatus className="fixed top-4 right-4 z-50" /> */}
                 <Toaster />
                 {children}
               </div>

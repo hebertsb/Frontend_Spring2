@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
@@ -18,15 +20,15 @@ export function BackendStatus({ className }: BackendStatusProps) {
       setBackendUrl(apiUrl);
       
       try {
-        // Intentar hacer ping al backend
-        await axios.get(apiUrl.replace('/api/', '/health/'), { timeout: 3000 });
+        // Intentar con endpoints que sabemos que existen
+        await axios.get(`${apiUrl}servicios/`, { timeout: 5000 });
         setStatus('online');
-      } catch {
-        // Si no hay endpoint de health, intentar con el endpoint de auth
-        try {
-          await axios.get(`${apiUrl}auth/`, { timeout: 3000 });
+      } catch (error: any) {
+        console.log('🔍 Backend status check error:', error.response?.status);
+        // Si el error es 401 (no autorizado), significa que el backend está online pero requiere auth
+        if (error.response?.status === 401) {
           setStatus('online');
-        } catch {
+        } else {
           setStatus('offline');
         }
       }

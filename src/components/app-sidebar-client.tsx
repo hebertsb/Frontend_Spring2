@@ -71,7 +71,7 @@ export function AppSidebarClient({ ...props }: React.ComponentProps<typeof Sideb
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <Link href="/cliente">
+              <Link href="/cliente?tab=reservas">
                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-blue-600 text-sidebar-primary-foreground">
                   <LayoutDashboard className="size-4" />
                 </div>
