@@ -10,7 +10,7 @@ const BotonStripeCheckout: React.FC<BotonStripeCheckoutProps> = ({ monto, descri
   const handleCheckout = async () => {
     try {
       const response = await axios.post('/crear-checkout-session/', {
-        amount: monto * 100, // Stripe espera centavos
+        precio: monto * 100, // Stripe espera centavos
         currency: 'bob',
         description: descripcion,
         success_url: window.location.origin + '/pago-exitoso',

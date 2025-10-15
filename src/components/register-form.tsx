@@ -21,7 +21,7 @@ interface FormData {
   genero: string;
   documento_identidad: string;
   pais: string;
-  rol: string; // stored as string in form state, converted to number on submit
+  rol: string; 
   rubro: string;
 }
 interface FormErrors {
