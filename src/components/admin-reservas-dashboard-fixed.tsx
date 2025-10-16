@@ -67,19 +67,19 @@ const AdminReservasDashboard = () => {
       let clienteEmail = "";
       let telefono = "";
 
-      // Si tiene usuario directamente (compatible con estructura anterior)
-      if (reserva.usuario) {
+      // 1. Si tiene cliente anidado (nuevo backend, preferido)
+      if (reserva.cliente && typeof reserva.cliente === 'object') {
+        cliente = `${reserva.cliente.nombre || reserva.cliente.nombres || ''} ${reserva.cliente.apellido || reserva.cliente.apellidos || ''}`.trim();
+        clienteEmail = reserva.cliente.email || '';
+        telefono = reserva.cliente.telefono || '';
+      }
+      // 2. Si tiene usuario directamente (estructura anterior)
+      else if (reserva.usuario) {
         cliente = `${reserva.usuario.nombres || ''} ${reserva.usuario.apellidos || ''}`.trim();
         clienteEmail = reserva.usuario.email || '';
         telefono = reserva.usuario.telefono || '';
       }
-      // Si tiene cliente anidado (nuevo backend)
-      else if (reserva.cliente && typeof reserva.cliente === 'object') {
-        cliente = `${reserva.cliente.nombre || ''} ${reserva.cliente.apellido || ''}`.trim();
-        clienteEmail = reserva.cliente.email || '';
-        telefono = reserva.cliente.telefono || '';
-      }
-      // Si solo tiene el ID del cliente
+      // 3. Si solo tiene el ID del cliente
       else if (reserva.cliente) {
         cliente = `Cliente ${reserva.cliente}`;
       }
@@ -92,12 +92,14 @@ const AdminReservasDashboard = () => {
         if (visitantes.length > 0) {
           numeroPersonas = visitantes.length;
 
-          // Buscar el titular para obtener info del cliente
-          const titular = visitantes.find((v: any) => v.visitante?.es_titular || v.es_titular);
-          if (titular && titular.visitante) {
-            cliente = `${titular.visitante.nombre} ${titular.visitante.apellido}`;
-            clienteEmail = titular.visitante.email || '';
-            telefono = titular.visitante.telefono || '';
+          // Buscar el titular para obtener info del cliente SOLO si no se obtuvo antes
+          if (!cliente) {
+            const titular = visitantes.find((v: any) => v.visitante?.es_titular || v.es_titular);
+            if (titular && titular.visitante) {
+              cliente = `${titular.visitante.nombre} ${titular.visitante.apellido}`;
+              clienteEmail = titular.visitante.email || '';
+              telefono = titular.visitante.telefono || '';
+            }
           }
         }
       } catch (error) {
