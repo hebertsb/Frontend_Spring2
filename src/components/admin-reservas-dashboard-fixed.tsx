@@ -630,62 +630,71 @@ const AdminReservasDashboard = () => {
       </div>
       {/* Vista de reglas de reprogramación */}
       {activeTab === "reglas" && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Reglas de Reprogramación</h2>
+        <div className="bg-white rounded-2xl shadow-xl p-8 mb-8 border border-gray-100">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-blue-700 flex items-center gap-2">
+              <svg className="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Reglas de Reprogramación
+            </h2>
             <button
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              className="bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-2 rounded-lg shadow hover:from-blue-600 hover:to-blue-800 font-semibold transition"
               onClick={() => { setEditingRegla(null); setShowReglaModal(true); }}
             >
-              Nueva Regla
+              + Nueva Regla
             </button>
           </div>
           {loadingReglas ? (
-            <div className="text-gray-600">Cargando reglas...</div>
+            <div className="text-gray-600 text-center py-8">Cargando reglas...</div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Aplica a</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Activa</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {reglas.map((regla) => (
-                  <tr key={regla.id}>
-                    <td className="px-4 py-2">{regla.nombre}</td>
-                    <td className="px-4 py-2">{regla.descripcion}</td>
-                    <td className="px-4 py-2">{regla.aplicable_a}</td>
-                    <td className="px-4 py-2">{regla.tipo_regla}</td>
-                    <td className="px-4 py-2">{regla.valor_numerico}</td>
-                    <td className="px-4 py-2">{regla.activa ? "Sí" : "No"}</td>
-                    <td className="px-4 py-2 flex gap-2">
-                      <button className="text-green-600 hover:text-green-900" onClick={() => { setEditingRegla(regla); setShowReglaModal(true); }}>Editar</button>
-                      <button className="text-red-600 hover:text-red-900" onClick={() => eliminarRegla(regla.id)}>Eliminar</button>
-                    </td>
+            <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+              <table className="min-w-full divide-y divide-gray-200 text-sm">
+                <thead className="bg-gradient-to-r from-blue-50 to-blue-100">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Nombre</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Descripción</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Aplica a</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Tipo</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Valor</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Activa</th>
+                    <th className="px-4 py-3 text-left font-semibold text-blue-700 uppercase tracking-wider">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {reglas.map((regla) => (
+                    <tr key={regla.id} className="hover:bg-blue-50 transition">
+                      <td className="px-4 py-3 font-medium text-gray-900">{regla.nombre}</td>
+                      <td className="px-4 py-3 text-gray-700">{regla.descripcion}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${regla.aplicable_a === 'CLIENTE' ? 'bg-green-100 text-green-700' : regla.aplicable_a === 'ADMIN' ? 'bg-yellow-100 text-yellow-700' : regla.aplicable_a === 'OPERADOR' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{regla.aplicable_a}</span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{regla.tipo_regla.replaceAll('_', ' ').replace('LIMITE', 'Límite').replace('TIEMPO', 'Tiempo')}</td>
+                      <td className="px-4 py-3 text-center font-bold text-blue-700">{regla.valor_numerico}</td>
+                      <td className="px-4 py-3 text-center">
+                        {regla.activa ? <span className="inline-block px-2 py-1 rounded bg-green-100 text-green-700 text-xs font-semibold">Sí</span> : <span className="inline-block px-2 py-1 rounded bg-red-100 text-red-700 text-xs font-semibold">No</span>}
+                      </td>
+                      <td className="px-4 py-3 flex gap-2 items-center">
+                        <button className="text-blue-600 hover:text-blue-900 font-semibold px-2 py-1 rounded transition" onClick={() => { setEditingRegla(regla); setShowReglaModal(true); }}>Editar</button>
+                        <button className="text-red-600 hover:text-red-900 font-semibold px-2 py-1 rounded transition" onClick={() => eliminarRegla(regla.id)}>Eliminar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
-          {errorRegla && <div className="text-red-600 mt-4">{errorRegla}</div>}
+          {errorRegla && <div className="text-red-600 mt-4 text-center">{errorRegla}</div>}
         </div>
       )}
 
       {/* Modal para crear/editar regla */}
       {showReglaModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">{editingRegla ? "Editar Regla" : "Nueva Regla"}</h2>
-              <button onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-100 animate-fade-in">
+            <div className="flex justify-between items-center px-8 py-6 border-b border-gray-100">
+              <h2 className="text-2xl font-bold text-blue-700">{editingRegla ? "Editar Regla" : "Nueva Regla"}</h2>
+              <button onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="text-gray-400 hover:text-gray-600 transition-colors text-2xl">✕</button>
             </div>
-            <form className="p-6 space-y-4" onSubmit={e => {
+            <form className="px-8 py-6 space-y-5" onSubmit={e => {
               e.preventDefault();
               const form = e.target as HTMLFormElement;
               const data = Object.fromEntries(new FormData(form));
@@ -704,40 +713,47 @@ const AdminReservasDashboard = () => {
               if (editingRegla) editarRegla(editingRegla.id, payload); else crearRegla(payload);
             }}>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Nombre</label>
-                <input name="nombre" defaultValue={editingRegla?.nombre || ""} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <label className="block text-sm font-semibold text-blue-700 mb-1">Nombre</label>
+                <input name="nombre" defaultValue={editingRegla?.nombre || ""} required className="mt-1 block w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 bg-blue-50/30" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Descripción</label>
-                <textarea name="descripcion" defaultValue={editingRegla?.descripcion || ""} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+                <label className="block text-sm font-semibold text-blue-700 mb-1">Descripción</label>
+                <textarea name="descripcion" defaultValue={editingRegla?.descripcion || ""} required className="mt-1 block w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 bg-blue-50/30" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Aplica a</label>
-                <select name="aplicable_a" defaultValue={editingRegla?.aplicable_a || "CLIENTE"} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                  <option value="CLIENTE">CLIENTE</option>
-                  <option value="ADMIN">ADMIN</option>
-                  <option value="OPERADOR">OPERADOR</option>
-                  <option value="ALL">TODOS</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Aplica a</label>
+                  <select name="aplicable_a" defaultValue={editingRegla?.aplicable_a || "CLIENTE"} required className="mt-1 block w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 bg-blue-50/30">
+                    <option value="CLIENTE">CLIENTE</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="OPERADOR">OPERADOR</option>
+                    <option value="ALL">TODOS</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Tipo de regla</label>
+                  <select name="tipo_regla" defaultValue={editingRegla?.tipo_regla || "LIMITE_REPROGRAMACIONES"} required className="mt-1 block w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 bg-blue-50/30">
+                    <option value="LIMITE_REPROGRAMACIONES">Límite de reprogramaciones</option>
+                    <option value="DESCUENTO_PENALIZACION">Penalización/Descuento</option>
+                    <option value="TIEMPO_MINIMO">Tiempo mínimo</option>
+                    <option value="TIEMPO_ANTICIPACION">Anticipación</option>
+                    <option value="OTRO">Otro</option>
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Tipo de regla</label>
-                <select name="tipo_regla" defaultValue={editingRegla?.tipo_regla || "LIMITE_REPROGRAMACIONES"} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
-                  <option value="LIMITE_REPROGRAMACIONES">Límite de reprogramaciones</option>
-                  <option value="OTRO">Otro</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="block text-sm font-semibold text-blue-700 mb-1">Valor numérico</label>
+                  <input name="valor_numerico" type="number" min="1" defaultValue={editingRegla?.valor_numerico || 1} required className="mt-1 block w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 bg-blue-50/30" />
+                </div>
+                <div className="flex items-center h-full mt-6 md:mt-0">
+                  <input name="activa" type="checkbox" defaultChecked={editingRegla?.activa ?? true} className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-200" />
+                  <label className="ml-2 text-sm text-blue-700">Activa</label>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Valor numérico</label>
-                <input name="valor_numerico" type="number" min="1" defaultValue={editingRegla?.valor_numerico || 1} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input name="activa" type="checkbox" defaultChecked={editingRegla?.activa ?? true} className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
-                <label className="text-sm text-gray-700">Activa</label>
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancelar</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Guardar</button>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="px-5 py-2 border border-gray-200 text-blue-700 rounded-lg hover:bg-blue-50 font-semibold transition">Cancelar</button>
+                <button type="submit" className="px-7 py-2 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg hover:from-blue-600 hover:to-blue-800 font-semibold transition">Guardar</button>
               </div>
             </form>
           </div>

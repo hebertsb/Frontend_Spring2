@@ -8,6 +8,21 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { CalendarDays, Users, Clock, MapPin, RefreshCw, Calendar } from 'lucide-react'
 import { obtenerMisReservas, ReservaCliente } from '@/api/cliente-panel'
+
+type PaqueteReserva = {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  duracion?: number;
+  precio_bob?: number;
+  imagen_principal?: string;
+  punto_salida?: string;
+  estado?: string;
+};
+
+type ReservaConPaquete = ReservaCliente & {
+  paquete?: PaqueteReserva | null;
+};
 import { obtenerPaqueteTuristico } from '@/api/paquetes'
 import { useToast } from '@/hooks/use-toast'
 import useAuth from '@/hooks/useAuth'
@@ -34,8 +49,8 @@ const getStatusText = (estado: string) => {
 
 export default function ClientPackages() {
   const router = useRouter();
-  const [packages, setPackages] = useState<ReservaCliente[]>([])
-  const [filteredPackages, setFilteredPackages] = useState<ReservaCliente[]>([])
+  const [packages, setPackages] = useState<ReservaConPaquete[]>([])
+  const [filteredPackages, setFilteredPackages] = useState<ReservaConPaquete[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [loading, setLoading] = useState(true)
@@ -44,7 +59,7 @@ export default function ClientPackages() {
   const { user } = useAuth()
 
   // Cargar reservas y filtrar solo activos
-    const cargarPaquetes = async () => {
+  const cargarPaquetes = async () => {
     if (!user) {
       toast({
         title: "Error",
@@ -56,36 +71,13 @@ export default function ClientPackages() {
     try {
       setLoading(true);
       const reservas = await obtenerMisReservas();
-      // Filtrar solo activos
-      const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
-
-      // Enriquecer cada reserva con los datos completos del paquete
-           const paquetesEnriquecidos = await Promise.all(
-             activos.map(async (r: ReservaCliente) => {
-               // Si el paquete ya tiene más campos que solo id y nombre, se asume que está completo
-               if (r.paquete && Object.keys(r.paquete).length > 2) {
-                 return r;
-               }
-               // Si el campo paquete existe pero solo tiene id y nombre, buscar el paquete completo por id
-               if (r.paquete && r.paquete.id) {
-                 try {
-                   const paqueteCompleto = await obtenerPaqueteTuristico(Number(r.paquete.id));
-                   return {
-                     ...r,
-                     paquete: paqueteCompleto
-                   };
-                 } catch (e) {
-                   return r;
-                 }
-               }
-               return r;
-             })
-           );
-      setPackages(paquetesEnriquecidos || []);
-      if (paquetesEnriquecidos && paquetesEnriquecidos.length > 0) {
+      // Filtrar solo reservas pagadas, en curso o próximas
+      const activos = reservas.filter((r: any) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes((r.estado || '').toUpperCase()));
+      setPackages(activos || []);
+      if (activos && activos.length > 0) {
         toast({
           title: "✅ Paquetes activos cargados",
-          description: `Se encontraron ${paquetesEnriquecidos.length} paquetes activos`,
+          description: `Se encontraron ${activos.length} paquetes activos`,
         });
       }
     } catch (error: any) {
@@ -199,96 +191,101 @@ export default function ClientPackages() {
           {filteredPackages.map((pkg) => (
             <Card key={pkg.id} className="overflow-hidden">
               {/* Imagen principal del paquete */}
-              <div className="aspect-video relative overflow-hidden">
-                <img
-                  src={(pkg.paquete && (pkg.paquete as any).imagen_principal) || '/paquete-placeholder.png'}
-                  alt={pkg.paquete?.nombre || 'Paquete turístico'}
-                  className="w-full h-full object-cover transition-transform hover:scale-105"
-                />
-                <div className="absolute top-2 right-2">
-                  <Badge className={getStatusColor(pkg.estado.toLowerCase())}>
-                    {getStatusText(pkg.estado.toLowerCase())}
-                  </Badge>
-                </div>
-              </div>
-
-              <CardHeader>
-                <div className="space-y-1">
-                  <CardTitle className="text-lg">{pkg.paquete?.nombre || 'Paquete'}</CardTitle>
-                  <CardDescription>{pkg.paquete && (pkg.paquete as any).descripcion || ''}</CardDescription>
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* Detalles del paquete */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span>{pkg.paquete && (pkg.paquete as any).punto_salida || '-'}</span>
+              {pkg.paquete ? (
+                <>
+                  <div className="aspect-video relative overflow-hidden">
+                    <img
+                      src={pkg.paquete.imagen_principal ?? '/paquete-placeholder.png'}
+                      alt={pkg.paquete.nombre ?? 'Paquete turístico'}
+                      className="w-full h-full object-cover transition-transform hover:scale-105"
+                    />
+                    <div className="absolute top-2 right-2">
+                      <Badge className={getStatusColor((pkg.estado || '').toLowerCase())}>
+                        {getStatusText((pkg.estado || '').toLowerCase())}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>{pkg.paquete && (pkg.paquete as any).duracion || '-'} días</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Users className="h-4 w-4" />
-                    <span>{pkg.numero_personas || 1} participante{(pkg.numero_personas || 1) > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CalendarDays className="h-4 w-4" />
-                    <span>{formatDate(pkg.fecha_inicio || pkg.fecha || '')} - {formatDate(pkg.fecha_fin || pkg.fecha || '')}</span>
-                  </div>
-                </div>
-
-                {/* Precio y fecha de compra */}
-                <div className="pt-2 border-t">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="text-lg font-bold">
-                        {(pkg.paquete && (pkg.paquete as any).precio_bob) ? `Bs. ${Number((pkg.paquete as any).precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}` : 'Bs. 0.00'}
+                  <CardHeader>
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg">{pkg.paquete.nombre}</CardTitle>
+                      <CardDescription>{pkg.paquete.descripcion ?? ''}</CardDescription>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Detalles del paquete */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span>{pkg.paquete.punto_salida ?? '-'}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Comprado el {formatDate(pkg.created_at)}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Clock className="h-4 w-4" />
+                        <span>{pkg.paquete.duracion ?? '-'} días</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        <span>{pkg.numero_personas || 1} participante{(pkg.numero_personas || 1) > 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarDays className="h-4 w-4" />
+                        <span>{formatDate(pkg.fecha_inicio || pkg.fecha || '')} - {formatDate(pkg.fecha_fin || pkg.fecha || '')}</span>
                       </div>
                     </div>
-                    <Badge variant="outline">
-                      {pkg.paquete && (pkg.paquete as any).estado || '-'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Acciones */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => {
-                      if (pkg.id) {
-                        router.push(`/reservas/${pkg.id}`);
-                      }
-                    }}
-                    disabled={!pkg.id}
-                  >
-                    Ver Detalles
-                  </Button>
-                  {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
-                  {pkg.estado === 'PAGADA' && (
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-orange-600 hover:bg-orange-700"
-                      onClick={() => {
-                        if (pkg.id) {
-                          router.push(`/reservas/${pkg.id}?reprogramar=1`);
-                        }
-                      }}
-                    >
-                      <Calendar className="w-4 h-4 mr-1" />
-                      Reprogramar
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
+                    {/* Precio y fecha de compra */}
+                    <div className="pt-2 border-t">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="text-lg font-bold">
+                            {pkg.paquete.precio_bob ? `Bs. ${Number(pkg.paquete.precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}` : 'Bs. 0.00'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Comprado el {formatDate(pkg.created_at)}
+                          </div>
+                        </div>
+                        <Badge variant="outline">
+                          {pkg.paquete.estado ?? '-'}
+                        </Badge>
+                      </div>
+                    </div>
+                    {/* Acciones */}
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          if (pkg.id) {
+                            router.push(`/reservas/${pkg.id}`);
+                          }
+                        }}
+                        disabled={!pkg.id}
+                      >
+                        Ver Detalles
+                      </Button>
+                      {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
+                      {pkg.estado === 'PAGADA' && (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-orange-600 hover:bg-orange-700"
+                          onClick={() => {
+                            if (pkg.id) {
+                              router.push(`/reservas/${pkg.id}?reprogramar=1`);
+                            }
+                          }}
+                        >
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Reprogramar
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </>
+              ) : (
+                <CardHeader>
+                  <CardTitle className="text-lg">Paquete no disponible</CardTitle>
+                  <CardDescription>Este paquete ya no está disponible o fue eliminado.</CardDescription>
+                </CardHeader>
+              )}
             </Card>
           ))}
         </div>
