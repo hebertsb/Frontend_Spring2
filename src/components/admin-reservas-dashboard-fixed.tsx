@@ -220,17 +220,26 @@ const AdminReservasDashboard = () => {
   }, []);
 
   const filteredReservas = reservas.filter((reserva: Reserva) => {
+    // Si no hay ningún filtro ni búsqueda, mostrar todas las reservas
+    if (
+      (!searchTerm || searchTerm.trim() === "") &&
+      (filterEstado === "todos" || !filterEstado) &&
+      (filterDestino === "todos" || !filterDestino)
+    ) {
+      return true;
+    }
+
     // Filtro de búsqueda por cliente, destino o paquete
     const matchesSearch = (reserva.cliente || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
                          (reserva.destino || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (reserva.paquete || "").toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     // Filtro por estado
     const matchesEstado = filterEstado === "todos" || (reserva.estado?.toLowerCase() === filterEstado);
-    
+
     // Filtro por destino
     const matchesDestino = filterDestino === "todos" || (reserva.destino || "").toLowerCase().includes(filterDestino.toLowerCase());
-    
+
     return matchesSearch && matchesEstado && matchesDestino;
   });
 
