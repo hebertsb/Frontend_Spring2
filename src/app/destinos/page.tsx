@@ -181,7 +181,7 @@ export default function PaginaDestinos() {
                       ubicacion={servicio.categoria?.nombre || "Sin categoría"}
                       descripcion={servicio.descripcion}
                       calificacion={4.5}
-                      urlImagen={servicio.imagen_url?.[0] || "/placeholder.svg"}
+                      urlImagen={servicio.imagen_url || "/placeholder.svg"}
                       precio={servicio.precio_usd}
                       duracion={servicio.duracion}
                     />

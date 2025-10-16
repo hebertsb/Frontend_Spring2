@@ -15,7 +15,7 @@ export interface Servicio {
   punto_encuentro: string;
   estado: string;
   // puede ser una URL directa o un arreglo de URLs (algunas partes del código usan [0])
-  imagen_url: string | string[];
+  imagen_url: string ;
   precio_usd: string ; // puede venir como "90.00" o 90
   servicios_incluidos: string[]; // array de strings ["Guía", "Hotel", ...]
 }
