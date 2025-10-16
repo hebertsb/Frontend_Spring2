@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { Calendar, Edit, Trash2, Eye, EyeOff, MapPin, Users, Star, CheckCircle, X, User, Phone, Mail, Clock, DollarSign } from 'lucide-react';
 import { listarReservas, crearReserva, editarReserva, eliminarReserva } from "@/api/reservas";
+import { obtenerHistorialReprogramacion } from "@/api/historial-reprogramacion";
 import { obtenerVisitantesReserva } from "@/api/visitantes";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
@@ -48,6 +49,8 @@ const AdminReservasDashboard = () => {
   const [activeTab, setActiveTab] = useState("panel");
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [historialReprogramacion, setHistorialReprogramacion] = useState<any[]>([]);
+  const [loadingHistorial, setLoadingHistorial] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingReserva, setEditingReserva] = useState<Reserva | null>(null);
   
@@ -235,9 +238,17 @@ const AdminReservasDashboard = () => {
   const destinosUnicos = Array.from(new Set(reservas.map((r: Reserva) => r.destino).filter((destino: string | undefined) => destino && destino.trim() !== "")));
 
   // Función para abrir el modal de detalles
-  const verDetallesReserva = (reserva: Reserva) => {
+  const verDetallesReserva = async (reserva: Reserva) => {
     setSelectedReserva(reserva);
     setShowModal(true);
+    setLoadingHistorial(true);
+    try {
+      const historial = await obtenerHistorialReprogramacion(reserva.id);
+      setHistorialReprogramacion(historial.results || historial || []);
+    } catch (error) {
+      setHistorialReprogramacion([]);
+    }
+    setLoadingHistorial(false);
   };
 
   // Función para cerrar el modal
@@ -1048,9 +1059,50 @@ const AdminReservasDashboard = () => {
               >
                 Editar Reserva
               </button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
+              <button 
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={async () => {
+                  if (!selectedReserva) return;
+                  try {
+                    await editarReserva(selectedReserva.id, { estado: 'PAGADA' });
+                    toast({ title: 'Reserva confirmada', description: 'El estado ha sido actualizado a PAGADA', variant: 'default' });
+                    setShowModal(false);
+                    recargarReservas();
+                  } catch (error) {
+                    toast({ title: 'Error al confirmar', description: 'No se pudo actualizar el estado', variant: 'destructive' });
+                  }
+                }}
+              >
                 Confirmar Reserva
               </button>
+            </div>
+
+            {/* Historial de reprogramaciones */}
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold text-indigo-900 mb-2 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Historial de Reprogramaciones
+              </h3>
+              {loadingHistorial ? (
+                <div className="text-gray-500 text-sm">Cargando historial...</div>
+              ) : historialReprogramacion.length === 0 ? (
+                <div className="text-gray-500 text-sm">No hay reprogramaciones registradas para esta reserva.</div>
+              ) : (
+                <ul className="space-y-2">
+                  {historialReprogramacion.map((item, idx) => (
+                    <li key={idx} className="bg-white rounded-lg p-3 border border-indigo-200">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-2">
+                        <div>
+                          <span className="font-medium text-indigo-800">{item.fecha_anterior ? `De: ${new Date(item.fecha_anterior).toLocaleString()}` : ''}</span>
+                          {item.fecha_nueva && <span className="ml-2 font-medium text-green-700">a: {new Date(item.fecha_nueva).toLocaleString()}</span>}
+                        </div>
+                        <div className="text-sm text-gray-600">Motivo: {item.motivo || 'Sin motivo'}</div>
+                        <div className="text-xs text-gray-500">Reprogramado por: {item.reprogramado_por || 'N/A'}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

@@ -11,16 +11,18 @@ export const listarReservas = () => {
 // Crear una nueva reserva
 export const crearReserva = async (data: any) => {
   try {
+    // Clonar el objeto y eliminar el campo 'estado' si existe
+    const { estado, ...dataSinEstado } = data || {};
     console.log('🚀 API: Enviando reserva al backend');
     console.log('🚀 API: URL:', 'reservas/');
-    console.log('🚀 API: Datos a enviar:', JSON.stringify(data, null, 2));
-    
-    const response = await axios.post('reservas/', data);
-    
+    console.log('🚀 API: Datos a enviar:', JSON.stringify(dataSinEstado, null, 2));
+
+    const response = await axios.post('reservas/', dataSinEstado);
+
     console.log('✅ API: Respuesta exitosa');
     console.log('✅ API: Status:', response.status);
     console.log('✅ API: Data:', response.data);
-    
+
     return response;
   } catch (error: any) {
     console.error('❌ API: Error al crear reserva:', error);
@@ -30,32 +32,32 @@ export const crearReserva = async (data: any) => {
     console.error('❌ API: Response headers:', error.response?.headers);
     console.error('❌ API: Request headers:', error.config?.headers);
     console.error('❌ API: Request data enviada:', error.config?.data);
-    
+
     // Si es error 500, es probable que sea HTML
     if (error.response?.status === 500) {
       console.error('🚨 ERROR 500 DETECTADO - PROBLEMA EN EL SERVIDOR BACKEND');
       console.error('📄 CONTENT TYPE:', error.response?.headers?.['content-type']);
-      
+
       if (typeof error.response?.data === 'string') {
         console.error('📄 RESPUESTA COMPLETA (primeros 2000 chars):', error.response.data.substring(0, 2000));
-        
+
         // Buscar información específica del error Django
         const djangoErrorMatch = error.response.data.match(/<h1>(.*?)<\/h1>/);
         if (djangoErrorMatch) {
           console.error('🎯 TÍTULO DEL ERROR:', djangoErrorMatch[1]);
         }
-        
+
         // Buscar el traceback
         const tracebackMatch1 = error.response.data.match(/Traceback[\s\S]*?(?=<\/pre>|$)/);
         if (tracebackMatch1) {
           console.error('📋 TRACEBACK ENCONTRADO:', tracebackMatch1[0]);
         }
-        
+
         const exceptionMatch = error.response.data.match(/<pre class="exception_value">([\s\S]*?)<\/pre>/);
         if (exceptionMatch) {
           console.error('🎯 EXCEPCIÓN ESPECÍFICA:', exceptionMatch[1]);
         }
-        
+
         // Buscar el traceback completo
         const tracebackMatch2 = error.response.data.match(/<div id="traceback">([\s\S]*?)<\/div>/);
         if (tracebackMatch2) {
