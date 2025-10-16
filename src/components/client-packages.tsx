@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { CalendarDays, Users, Clock, MapPin, RefreshCw, Calendar } from 'lucide-react'
 import { obtenerMisReservas, ReservaCliente } from '@/api/cliente-panel'
+import { obtenerPaqueteTuristico } from '@/api/paquetes'
 import { useToast } from '@/hooks/use-toast'
 import useAuth from '@/hooks/useAuth'
 
@@ -54,14 +55,36 @@ export default function ClientPackages() {
     }
     try {
       setLoading(true);
-  const reservas = await obtenerMisReservas();
-  // Filtrar solo activos
-  const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
-  setPackages(activos || []);
-      if (activos && activos.length > 0) {
+      const reservas = await obtenerMisReservas();
+      // Filtrar solo activos
+      const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
+
+      // Enriquecer cada reserva con los datos completos del paquete
+      const paquetesEnriquecidos = await Promise.all(
+        activos.map(async (r: ReservaCliente) => {
+          if (r.paquete && r.paquete.id) {
+            try {
+              const paqueteCompleto = await obtenerPaqueteTuristico(r.paquete.id);
+              return {
+                ...r,
+                paquete: {
+                  ...r.paquete,
+                  ...paqueteCompleto
+                } as any // Forzar a any para permitir campos enriquecidos
+              };
+            } catch (e) {
+              // Si falla la consulta, usar el paquete parcial
+              return r;
+            }
+          }
+          return r;
+        })
+      );
+      setPackages(paquetesEnriquecidos || []);
+      if (paquetesEnriquecidos && paquetesEnriquecidos.length > 0) {
         toast({
           title: "✅ Paquetes activos cargados",
-          description: `Se encontraron ${activos.length} paquetes activos`,
+          description: `Se encontraron ${paquetesEnriquecidos.length} paquetes activos`,
         });
       }
     } catch (error: any) {
@@ -174,33 +197,13 @@ export default function ClientPackages() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredPackages.map((pkg) => (
             <Card key={pkg.id} className="overflow-hidden">
-              {/* Imagen */}
+              {/* Imagen principal del paquete */}
               <div className="aspect-video relative overflow-hidden">
-                {/* Imagen no disponible en reservas, usar placeholder */}
                 <img
-                  src={(() => {
-                    // Si el paquete tiene imagen, úsala
-                    if (pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen) {
-                      return pkg.paquete.imagen;
-                    }
-                    // Buscar imagen de ejemplo por id (convertir ambos a string para comparar)
-                    const idPaquete = pkg.paquete?.id ? String(pkg.paquete.id) : String(pkg.id);
-                    // Si no hay, usar placeholder
-                    return '/paquete-placeholder.png';
-                  })() as string}
-                  alt={pkg.paquete?.nombre || 'Paquete'}
+                  src={(pkg.paquete && (pkg.paquete as any).imagen_principal) || '/paquete-placeholder.png'}
+                  alt={pkg.paquete?.nombre || 'Paquete turístico'}
                   className="w-full h-full object-cover transition-transform hover:scale-105"
                 />
-                  {/* Imagen de paquete o placeholder */}
-                  <img
-                    src={
-                      pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen
-                        ? pkg.paquete.imagen
-                        : '/img/paquete-placeholder.jpg'
-                    }
-                    alt={pkg.paquete?.nombre || 'Paquete turístico'}
-                    className="object-cover w-full h-full"
-                  />
                 <div className="absolute top-2 right-2">
                   <Badge className={getStatusColor(pkg.estado.toLowerCase())}>
                     {getStatusText(pkg.estado.toLowerCase())}
@@ -211,7 +214,7 @@ export default function ClientPackages() {
               <CardHeader>
                 <div className="space-y-1">
                   <CardTitle className="text-lg">{pkg.paquete?.nombre || 'Paquete'}</CardTitle>
-                  <CardDescription>{pkg.paquete && 'descripcion' in pkg.paquete ? (pkg.paquete as any).descripcion : ''}</CardDescription>
+                  <CardDescription>{pkg.paquete && (pkg.paquete as any).descripcion || ''}</CardDescription>
                 </div>
               </CardHeader>
 
@@ -220,11 +223,11 @@ export default function ClientPackages() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <MapPin className="h-4 w-4" />
-                    <span>{pkg.paquete && 'destino' in pkg.paquete ? (pkg.paquete as any).destino : '-'}</span>
+                    <span>{pkg.paquete && (pkg.paquete as any).punto_salida || '-'}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    <span>{('duracion' in pkg) ? (pkg as any).duracion : '-'} días</span>
+                    <span>{pkg.paquete && (pkg.paquete as any).duracion || '-'} días</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Users className="h-4 w-4" />
@@ -240,13 +243,15 @@ export default function ClientPackages() {
                 <div className="pt-2 border-t">
                   <div className="flex justify-between items-center">
                     <div>
-                      <div className="text-lg font-bold">{formatPrice(pkg.total)}</div>
+                      <div className="text-lg font-bold">
+                        {(pkg.paquete && (pkg.paquete as any).precio_bob) ? `Bs. ${Number((pkg.paquete as any).precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}` : 'Bs. 0.00'}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         Comprado el {formatDate(pkg.created_at)}
                       </div>
                     </div>
                     <Badge variant="outline">
-                      {pkg.paquete && 'tipo' in pkg.paquete ? (pkg.paquete as any).tipo : '-'}
+                      {pkg.paquete && (pkg.paquete as any).estado || '-'}
                     </Badge>
                   </div>
                 </div>
