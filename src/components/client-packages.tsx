@@ -44,7 +44,7 @@ export default function ClientPackages() {
   const { user } = useAuth()
 
   // Cargar reservas y filtrar solo activos
-  const cargarPaquetes = async () => {
+    const cargarPaquetes = async () => {
     if (!user) {
       toast({
         title: "Error",
@@ -60,26 +60,27 @@ export default function ClientPackages() {
       const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
 
       // Enriquecer cada reserva con los datos completos del paquete
-      const paquetesEnriquecidos = await Promise.all(
-        activos.map(async (r: ReservaCliente) => {
-          if (r.paquete && r.paquete.id) {
-            try {
-              const paqueteCompleto = await obtenerPaqueteTuristico(r.paquete.id);
-              return {
-                ...r,
-                paquete: {
-                  ...r.paquete,
-                  ...paqueteCompleto
-                } as any // Forzar a any para permitir campos enriquecidos
-              };
-            } catch (e) {
-              // Si falla la consulta, usar el paquete parcial
-              return r;
-            }
-          }
-          return r;
-        })
-      );
+           const paquetesEnriquecidos = await Promise.all(
+             activos.map(async (r: ReservaCliente) => {
+               // Si el paquete ya tiene más campos que solo id y nombre, se asume que está completo
+               if (r.paquete && Object.keys(r.paquete).length > 2) {
+                 return r;
+               }
+               // Si el campo paquete existe pero solo tiene id y nombre, buscar el paquete completo por id
+               if (r.paquete && r.paquete.id) {
+                 try {
+                   const paqueteCompleto = await obtenerPaqueteTuristico(Number(r.paquete.id));
+                   return {
+                     ...r,
+                     paquete: paqueteCompleto
+                   };
+                 } catch (e) {
+                   return r;
+                 }
+               }
+               return r;
+             })
+           );
       setPackages(paquetesEnriquecidos || []);
       if (paquetesEnriquecidos && paquetesEnriquecidos.length > 0) {
         toast({
