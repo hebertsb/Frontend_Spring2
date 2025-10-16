@@ -29,11 +29,22 @@ import useAuth from '@/hooks/useAuth'
 
 const getStatusColor = (estado: string) => {
   switch (estado) {
-    case 'confirmado': return 'bg-green-100 text-green-800'
-    case 'en_curso': return 'bg-blue-100 text-blue-800'
-    case 'proximo': return 'bg-yellow-100 text-yellow-800'
-    case 'completado': return 'bg-purple-100 text-purple-800'
-    default: return 'bg-gray-100 text-gray-800'
+    case 'pagada':
+    case 'pagado':
+    case 'pagada/pagado':
+      return 'bg-green-100 text-green-700 border border-green-300';
+    case 'confirmado':
+      return 'bg-blue-100 text-blue-700 border border-blue-300';
+    case 'en_curso':
+      return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
+    case 'proximo':
+      return 'bg-orange-100 text-orange-700 border border-orange-300';
+    case 'completado':
+      return 'bg-purple-100 text-purple-700 border border-purple-300';
+    case 'pendiente':
+      return 'bg-gray-100 text-gray-700 border border-gray-300';
+    default:
+      return 'bg-gray-50 text-gray-400 border border-gray-200';
   }
 }
 
@@ -46,6 +57,32 @@ const getStatusText = (estado: string) => {
     default: return estado
   }
 }
+
+
+// Imágenes específicas para paquetes por id o nombre
+const PAQUETE_IMAGES: Record<string, string> = {
+  '1': 'https://i.ibb.co/HDtnp5G2/bandina2.jpg', // Andina id 1
+  'andina': 'https://i.ibb.co/HDtnp5G2/bandina2.jpg',
+  '2': 'https://i.ibb.co/6cVKNswF/maxresdefault.jpg', // Aventura Amazonica id 2
+  'aventura amazonica': 'https://i.ibb.co/6cVKNswF/maxresdefault.jpg',
+  'selva y cultura': 'https://i.ibb.co/5xRcxPrB/selva-y-culutra.png',
+  '3': 'https://i.ibb.co/5xRcxPrB/selva-y-culutra.png',
+  'ruta colonial': 'https://i.ibb.co/2YmWwX65/ruta-colonial.png',
+  '4': 'https://i.ibb.co/2YmWwX65/ruta-colonial.png',
+  'escapada gastronomica': 'https://i.ibb.co/m5TGPdFZ/escapada.png',
+  '5': 'https://i.ibb.co/m5TGPdFZ/escapada.png',
+  'naturaleza y relax': 'https://i.ibb.co/FLpNp2wB/el-paraiso-en-este-rinconcito.jpg',
+  '6': 'https://i.ibb.co/FLpNp2wB/el-paraiso-en-este-rinconcito.jpg',
+};
+
+const MOCK_IMAGES = [
+  '/mock/paquete1.jpg',
+  '/mock/paquete2.jpg',
+  '/mock/paquete3.jpg',
+  '/mock/paquete4.jpg',
+  '/mock/paquete5.jpg',
+  '/mock/paquete6.jpg',
+];
 
 export default function ClientPackages() {
   const router = useRouter();
@@ -188,27 +225,33 @@ export default function ClientPackages() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPackages.map((pkg) => (
+          {filteredPackages.map((pkg, idx) => (
             <Card key={pkg.id} className="overflow-hidden">
               {/* Imagen principal del paquete */}
               {pkg.paquete ? (
                 <>
                   <div className="aspect-video relative overflow-hidden">
                     <img
-                      src={pkg.paquete.imagen_principal ?? '/paquete-placeholder.png'}
+                      src={
+                        pkg.paquete.imagen_principal
+                          ? pkg.paquete.imagen_principal
+                          : (PAQUETE_IMAGES[String(pkg.paquete.id)]
+                              || (pkg.paquete.nombre && PAQUETE_IMAGES[pkg.paquete.nombre.trim().toLowerCase()])
+                              || MOCK_IMAGES[idx % MOCK_IMAGES.length])
+                      }
                       alt={pkg.paquete.nombre ?? 'Paquete turístico'}
                       className="w-full h-full object-cover transition-transform hover:scale-105"
                     />
                     <div className="absolute top-2 right-2">
-                      <Badge className={getStatusColor((pkg.estado || '').toLowerCase())}>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold capitalize shadow-sm ${getStatusColor((pkg.estado || '').toLowerCase())}`}>
                         {getStatusText((pkg.estado || '').toLowerCase())}
-                      </Badge>
+                      </span>
                     </div>
                   </div>
                   <CardHeader>
                     <div className="space-y-1">
-                      <CardTitle className="text-lg">{pkg.paquete.nombre}</CardTitle>
-                      <CardDescription>{pkg.paquete.descripcion ?? ''}</CardDescription>
+                      <CardTitle className="text-lg font-bold text-gray-800">{pkg.paquete.nombre}</CardTitle>
+                      <CardDescription className="text-gray-600">{pkg.paquete.descripcion ?? 'Sin descripción disponible.'}</CardDescription>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -216,11 +259,11 @@ export default function ClientPackages() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <MapPin className="h-4 w-4" />
-                        <span>{pkg.paquete.punto_salida ?? '-'}</span>
+                        <span>{pkg.paquete.punto_salida ?? 'No especificado'}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
-                        <span>{pkg.paquete.duracion ?? '-'} días</span>
+                        <span>{pkg.paquete.duracion ? `${pkg.paquete.duracion} días` : 'Duración no especificada'}</span>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Users className="h-4 w-4" />
@@ -235,16 +278,20 @@ export default function ClientPackages() {
                     <div className="pt-2 border-t">
                       <div className="flex justify-between items-center">
                         <div>
-                          <div className="text-lg font-bold">
-                            {pkg.paquete.precio_bob ? `Bs. ${Number(pkg.paquete.precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}` : 'Bs. 0.00'}
+                          <div className="text-lg font-bold text-blue-700">
+                            {typeof pkg.paquete.precio_bob === 'number' && pkg.paquete.precio_bob > 0
+                              ? `Bs. ${Number(pkg.paquete.precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
+                              : pkg.total && Number(pkg.total) > 0
+                                ? `Bs. ${Number(pkg.total).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
+                                : 'Sin precio registrado'}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Comprado el {formatDate(pkg.created_at)}
                           </div>
                         </div>
-                        <Badge variant="outline">
-                          {pkg.paquete.estado ?? '-'}
-                        </Badge>
+                        <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold border border-gray-200">
+                          {pkg.paquete.estado ?? pkg.estado ?? '-'}
+                        </span>
                       </div>
                     </div>
                     {/* Acciones */}
@@ -263,10 +310,10 @@ export default function ClientPackages() {
                         Ver Detalles
                       </Button>
                       {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
-                      {pkg.estado === 'PAGADA' && (
+                      {(pkg.estado && pkg.estado.toUpperCase() === 'PAGADA') && (
                         <Button
                           size="sm"
-                          className="flex-1 bg-orange-600 hover:bg-orange-700"
+                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
                           onClick={() => {
                             if (pkg.id) {
                               router.push(`/reservas/${pkg.id}?reprogramar=1`);
