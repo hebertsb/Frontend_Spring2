@@ -8,43 +8,16 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { CalendarDays, Users, Clock, MapPin, RefreshCw, Calendar } from 'lucide-react'
 import { obtenerMisReservas, ReservaCliente } from '@/api/cliente-panel'
-
-type PaqueteReserva = {
-  id: number;
-  nombre: string;
-  descripcion?: string;
-  duracion?: number;
-  precio_bob?: number;
-  imagen_principal?: string;
-  punto_salida?: string;
-  estado?: string;
-};
-
-type ReservaConPaquete = ReservaCliente & {
-  paquete?: PaqueteReserva | null;
-};
-import { obtenerPaqueteTuristico } from '@/api/paquetes'
 import { useToast } from '@/hooks/use-toast'
 import useAuth from '@/hooks/useAuth'
 
 const getStatusColor = (estado: string) => {
   switch (estado) {
-    case 'pagada':
-    case 'pagado':
-    case 'pagada/pagado':
-      return 'bg-green-100 text-green-700 border border-green-300';
-    case 'confirmado':
-      return 'bg-blue-100 text-blue-700 border border-blue-300';
-    case 'en_curso':
-      return 'bg-yellow-100 text-yellow-700 border border-yellow-300';
-    case 'proximo':
-      return 'bg-orange-100 text-orange-700 border border-orange-300';
-    case 'completado':
-      return 'bg-purple-100 text-purple-700 border border-purple-300';
-    case 'pendiente':
-      return 'bg-gray-100 text-gray-700 border border-gray-300';
-    default:
-      return 'bg-gray-50 text-gray-400 border border-gray-200';
+    case 'confirmado': return 'bg-green-100 text-green-800'
+    case 'en_curso': return 'bg-blue-100 text-blue-800'
+    case 'proximo': return 'bg-yellow-100 text-yellow-800'
+    case 'completado': return 'bg-purple-100 text-purple-800'
+    default: return 'bg-gray-100 text-gray-800'
   }
 }
 
@@ -58,36 +31,10 @@ const getStatusText = (estado: string) => {
   }
 }
 
-
-// Imágenes específicas para paquetes por id o nombre
-const PAQUETE_IMAGES: Record<string, string> = {
-  '1': 'https://i.ibb.co/HDtnp5G2/bandina2.jpg', // Andina id 1
-  'andina': 'https://i.ibb.co/HDtnp5G2/bandina2.jpg',
-  '2': 'https://i.ibb.co/6cVKNswF/maxresdefault.jpg', // Aventura Amazonica id 2
-  'aventura amazonica': 'https://i.ibb.co/6cVKNswF/maxresdefault.jpg',
-  'selva y cultura': 'https://i.ibb.co/5xRcxPrB/selva-y-culutra.png',
-  '3': 'https://i.ibb.co/5xRcxPrB/selva-y-culutra.png',
-  'ruta colonial': 'https://i.ibb.co/2YmWwX65/ruta-colonial.png',
-  '4': 'https://i.ibb.co/2YmWwX65/ruta-colonial.png',
-  'escapada gastronomica': 'https://i.ibb.co/m5TGPdFZ/escapada.png',
-  '5': 'https://i.ibb.co/m5TGPdFZ/escapada.png',
-  'naturaleza y relax': 'https://i.ibb.co/FLpNp2wB/el-paraiso-en-este-rinconcito.jpg',
-  '6': 'https://i.ibb.co/FLpNp2wB/el-paraiso-en-este-rinconcito.jpg',
-};
-
-const MOCK_IMAGES = [
-  '/mock/paquete1.jpg',
-  '/mock/paquete2.jpg',
-  '/mock/paquete3.jpg',
-  '/mock/paquete4.jpg',
-  '/mock/paquete5.jpg',
-  '/mock/paquete6.jpg',
-];
-
 export default function ClientPackages() {
   const router = useRouter();
-  const [packages, setPackages] = useState<ReservaConPaquete[]>([])
-  const [filteredPackages, setFilteredPackages] = useState<ReservaConPaquete[]>([])
+  const [packages, setPackages] = useState<ReservaCliente[]>([])
+  const [filteredPackages, setFilteredPackages] = useState<ReservaCliente[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('todos')
   const [loading, setLoading] = useState(true)
@@ -96,9 +43,6 @@ export default function ClientPackages() {
   const { user } = useAuth()
 
   // Cargar reservas y filtrar solo activos
-
-  // Enriquecer reservas con detalles completos del paquete
-  // Restaurar: mostrar todos los paquetes recibidos, sin filtro ni enriquecimiento
   const cargarPaquetes = async () => {
     if (!user) {
       toast({
@@ -110,12 +54,14 @@ export default function ClientPackages() {
     }
     try {
       setLoading(true);
-      const reservas = await obtenerMisReservas();
-      setPackages(reservas || []);
-      if (reservas && reservas.length > 0) {
+  const reservas = await obtenerMisReservas();
+  // Filtrar solo activos
+  const activos = reservas.filter((r: ReservaCliente) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes(r.estado));
+  setPackages(activos || []);
+      if (activos && activos.length > 0) {
         toast({
-          title: "✅ Paquetes cargados",
-          description: `Se encontraron ${reservas.length} paquetes`,
+          title: "✅ Paquetes activos cargados",
+          description: `Se encontraron ${activos.length} paquetes activos`,
         });
       }
     } catch (error: any) {
@@ -226,114 +172,117 @@ export default function ClientPackages() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredPackages.map((pkg, idx) => (
+          {filteredPackages.map((pkg) => (
             <Card key={pkg.id} className="overflow-hidden">
-              {/* Imagen principal del paquete */}
-              {pkg.paquete ? (
-                <>
-                  <div className="aspect-video relative overflow-hidden">
-                    <img
-                      src={
-                        pkg.paquete.imagen_principal
-                          ? pkg.paquete.imagen_principal
-                          : (PAQUETE_IMAGES[String(pkg.paquete.id)]
-                              || (pkg.paquete.nombre && PAQUETE_IMAGES[pkg.paquete.nombre.trim().toLowerCase()])
-                              || MOCK_IMAGES[idx % MOCK_IMAGES.length])
-                      }
-                      alt={pkg.paquete.nombre ?? 'Paquete turístico'}
-                      className="w-full h-full object-cover transition-transform hover:scale-105"
-                    />
-                    <div className="absolute top-2 right-2">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold capitalize shadow-sm ${getStatusColor((pkg.estado || '').toLowerCase())}`}>
-                        {getStatusText((pkg.estado || '').toLowerCase())}
-                      </span>
-                    </div>
+              {/* Imagen */}
+              <div className="aspect-video relative overflow-hidden">
+                {/* Imagen no disponible en reservas, usar placeholder */}
+                <img
+                  src={(() => {
+                    // Si el paquete tiene imagen, úsala
+                    if (pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen) {
+                      return pkg.paquete.imagen;
+                    }
+                    // Buscar imagen de ejemplo por id (convertir ambos a string para comparar)
+                    const idPaquete = pkg.paquete?.id ? String(pkg.paquete.id) : String(pkg.id);
+                    // Si no hay, usar placeholder
+                    return '/paquete-placeholder.png';
+                  })() as string}
+                  alt={pkg.paquete?.nombre || 'Paquete'}
+                  className="w-full h-full object-cover transition-transform hover:scale-105"
+                />
+                  {/* Imagen de paquete o placeholder */}
+                  <img
+                    src={
+                      pkg.paquete && 'imagen' in pkg.paquete && typeof pkg.paquete.imagen === 'string' && pkg.paquete.imagen
+                        ? pkg.paquete.imagen
+                        : '/img/paquete-placeholder.jpg'
+                    }
+                    alt={pkg.paquete?.nombre || 'Paquete turístico'}
+                    className="object-cover w-full h-full"
+                  />
+                <div className="absolute top-2 right-2">
+                  <Badge className={getStatusColor(pkg.estado.toLowerCase())}>
+                    {getStatusText(pkg.estado.toLowerCase())}
+                  </Badge>
+                </div>
+              </div>
+
+              <CardHeader>
+                <div className="space-y-1">
+                  <CardTitle className="text-lg">{pkg.paquete?.nombre || 'Paquete'}</CardTitle>
+                  <CardDescription>{pkg.paquete && 'descripcion' in pkg.paquete ? (pkg.paquete as any).descripcion : ''}</CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {/* Detalles del paquete */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span>{pkg.paquete && 'destino' in pkg.paquete ? (pkg.paquete as any).destino : '-'}</span>
                   </div>
-                  <CardHeader>
-                    <div className="space-y-1">
-                      <CardTitle className="text-lg font-bold text-gray-800">{pkg.paquete.nombre}</CardTitle>
-                      <CardDescription className="text-gray-600">{pkg.paquete.descripcion ?? 'Sin descripción disponible.'}</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Detalles del paquete */}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>{pkg.paquete.punto_salida ?? 'No especificado'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{pkg.paquete.duracion ? `${pkg.paquete.duracion} días` : 'Duración no especificada'}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Users className="h-4 w-4" />
-                        <span>{pkg.numero_personas || 1} participante{(pkg.numero_personas || 1) > 1 ? 's' : ''}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CalendarDays className="h-4 w-4" />
-                        <span>{formatDate(pkg.fecha_inicio || pkg.fecha || '')} - {formatDate(pkg.fecha_fin || pkg.fecha || '')}</span>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>{('duracion' in pkg) ? (pkg as any).duracion : '-'} días</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Users className="h-4 w-4" />
+                    <span>{pkg.numero_personas || 1} participante{(pkg.numero_personas || 1) > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarDays className="h-4 w-4" />
+                    <span>{formatDate(pkg.fecha_inicio || pkg.fecha || '')} - {formatDate(pkg.fecha_fin || pkg.fecha || '')}</span>
+                  </div>
+                </div>
+
+                {/* Precio y fecha de compra */}
+                <div className="pt-2 border-t">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="text-lg font-bold">{formatPrice(pkg.total)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Comprado el {formatDate(pkg.created_at)}
                       </div>
                     </div>
-                    {/* Precio y fecha de compra */}
-                    <div className="pt-2 border-t">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <div className="text-lg font-bold text-blue-700">
-                            {typeof pkg.paquete.precio_bob === 'number' && pkg.paquete.precio_bob > 0
-                              ? `Bs. ${Number(pkg.paquete.precio_bob).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
-                              : pkg.total && Number(pkg.total) > 0
-                                ? `Bs. ${Number(pkg.total).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
-                                : 'Sin precio registrado'}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Comprado el {formatDate(pkg.created_at)}
-                          </div>
-                        </div>
-                        <span className="inline-block px-2 py-1 rounded bg-gray-100 text-gray-700 text-xs font-semibold border border-gray-200">
-                          {pkg.paquete.estado ?? pkg.estado ?? '-'}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Acciones */}
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => {
-                          if (pkg.id) {
-                            router.push(`/reservas/${pkg.id}`);
-                          }
-                        }}
-                        disabled={!pkg.id}
-                      >
-                        Ver Detalles
-                      </Button>
-                      {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
-                      {(pkg.estado && pkg.estado.toUpperCase() === 'PAGADA') && (
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
-                          onClick={() => {
-                            if (pkg.id) {
-                              router.push(`/reservas/${pkg.id}?reprogramar=1`);
-                            }
-                          }}
-                        >
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Reprogramar
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </>
-              ) : (
-                <CardHeader>
-                  <CardTitle className="text-lg">Paquete no disponible</CardTitle>
-                  <CardDescription>Este paquete ya no está disponible o fue eliminado.</CardDescription>
-                </CardHeader>
-              )}
+                    <Badge variant="outline">
+                      {pkg.paquete && 'tipo' in pkg.paquete ? (pkg.paquete as any).tipo : '-'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Acciones */}
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      if (pkg.id) {
+                        router.push(`/reservas/${pkg.id}`);
+                      }
+                    }}
+                    disabled={!pkg.id}
+                  >
+                    Ver Detalles
+                  </Button>
+                  {/* Mostrar botón Reprogramar solo si la reserva está pagada y es reprogramable */}
+                  {pkg.estado === 'PAGADA' && (
+                    <Button
+                      size="sm"
+                      className="flex-1 bg-orange-600 hover:bg-orange-700"
+                      onClick={() => {
+                        if (pkg.id) {
+                          router.push(`/reservas/${pkg.id}?reprogramar=1`);
+                        }
+                      }}
+                    >
+                      <Calendar className="w-4 h-4 mr-1" />
+                      Reprogramar
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
             </Card>
           ))}
         </div>
