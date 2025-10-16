@@ -11,9 +11,10 @@ interface Paquete {
   descripcion: string;
   duracion: string;
   precio_bob: string;
-  imagen_principal: string;
+  imagen_principal: string; 
   punto_salida: string;
 }
+
 
 
 const PaquetesPage: React.FC = () => {
@@ -48,6 +49,7 @@ const PaquetesPage: React.FC = () => {
   return (
     <div className="w-full min-h-[80vh] bg-white">
       <Navegacion />
+    {/* <p>{JSON.stringify(paquetes)}</p> */}
       {!paqueteSeleccionado ? (
         <div className="max-w-7xl mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold mb-6 text-center">Paquetes Turísticos</h1>
