@@ -108,8 +108,12 @@ export default function ClientPackages() {
     try {
       setLoading(true);
       const reservas = await obtenerMisReservas();
-      // Filtrar solo reservas pagadas, en curso o próximas
-      const activos = reservas.filter((r: any) => ['PAGADA', 'EN_CURSO', 'PROXIMO'].includes((r.estado || '').toUpperCase()));
+      // Mostrar todos los paquetes relevantes (pagados, confirmados, completados, reprogramados, en curso, próximos)
+      const estadosValidos = [
+        'PAGADA', 'PAGADO', 'CONFIRMADA', 'CONFIRMADO', 'COMPLETADA', 'COMPLETADO',
+        'REPROGRAMADA', 'EN_CURSO', 'PROXIMO'
+      ];
+      const activos = reservas.filter((r: any) => estadosValidos.includes((r.estado || '').toUpperCase()));
       setPackages(activos || []);
       if (activos && activos.length > 0) {
         toast({
