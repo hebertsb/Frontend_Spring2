@@ -1,6 +1,7 @@
 import React, { useState, useEffect, ChangeEvent } from "react";
 import { Calendar, Edit, Trash2, Eye, EyeOff, MapPin, Users, Star, CheckCircle, X, User, Phone, Mail, Clock, DollarSign } from 'lucide-react';
 import { listarReservas, crearReserva, editarReserva, eliminarReserva } from "@/api/reservas";
+import axios from "@/api/axios";
 import { obtenerHistorialReprogramacion } from "@/api/historial-reprogramacion";
 import { obtenerVisitantesReserva } from "@/api/visitantes";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +48,57 @@ const AdminReservasDashboard = () => {
   const [filterDestino, setFilterDestino] = useState("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("panel");
+  // Estado para reglas de reprogramación
+  const [reglas, setReglas] = useState<any[]>([]);
+  const [loadingReglas, setLoadingReglas] = useState(false);
+  const [showReglaModal, setShowReglaModal] = useState(false);
+  const [editingRegla, setEditingRegla] = useState<any | null>(null);
+  const [errorRegla, setErrorRegla] = useState<string | null>(null);
+  // CRUD reglas de reprogramación
+  const cargarReglas = async () => {
+    setLoadingReglas(true);
+    try {
+      const res = await axios.get("/reglas-reprogramacion/");
+      setReglas(res.data);
+    } catch (e) {
+      setErrorRegla("No se pudieron cargar las reglas");
+    } finally {
+      setLoadingReglas(false);
+    }
+  };
+
+  const crearRegla = async (regla: any) => {
+    try {
+      const res = await axios.post("/reglas-reprogramacion/", regla);
+      setShowReglaModal(false);
+      cargarReglas();
+      toast({ title: "Regla creada", description: res.data.nombre });
+    } catch (e: any) {
+      toast({ title: "Error al crear regla", description: e?.response?.data?.detail || "Error desconocido", variant: "destructive" });
+    }
+  };
+
+  const editarRegla = async (id: number, regla: any) => {
+    try {
+      const res = await axios.put(`/reglas-reprogramacion/${id}/`, regla);
+      setShowReglaModal(false);
+      setEditingRegla(null);
+      cargarReglas();
+      toast({ title: "Regla actualizada", description: res.data.nombre });
+    } catch (e: any) {
+      toast({ title: "Error al editar regla", description: e?.response?.data?.detail || "Error desconocido", variant: "destructive" });
+    }
+  };
+
+  const eliminarRegla = async (id: number) => {
+    try {
+      await axios.delete(`/reglas-reprogramacion/${id}/`);
+      cargarReglas();
+      toast({ title: "Regla eliminada" });
+    } catch (e: any) {
+      toast({ title: "Error al eliminar regla", description: e?.response?.data?.detail || "Error desconocido", variant: "destructive" });
+    }
+  };
   const [selectedReserva, setSelectedReserva] = useState<Reserva | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [historialReprogramacion, setHistorialReprogramacion] = useState<any[]>([]);
@@ -197,13 +249,12 @@ const AdminReservasDashboard = () => {
   };
 
   useEffect(() => {
-    const cargarReservas = async () => {
+    const cargarReservasYReglas = async () => {
       setLoading(true);
       try {
         console.log("📝 Cargando reservas con DJANGO BACKEND...");
         const res = await listarReservas();
         console.log("📝 Datos de reservas Django recibidos:", res.data);
-        
         // 🚀 PROCESAR CON NUEVA LÓGICA DJANGO
         const reservasMapeadas = await Promise.all(
           res.data.map(async (reserva: any) => {
@@ -211,7 +262,6 @@ const AdminReservasDashboard = () => {
             return await procesarReservaDjango(reserva);
           })
         );
-        
         console.log("✅ Reservas Django procesadas:", reservasMapeadas.length);
         setReservas(reservasMapeadas);
         setLoading(false);
@@ -220,9 +270,10 @@ const AdminReservasDashboard = () => {
         setError("No se pudieron cargar las reservas");
         setLoading(false);
       }
+      // Cargar reglas de reprogramación
+      cargarReglas();
     };
-    
-    cargarReservas();
+    cargarReservasYReglas();
   }, []);
 
   const filteredReservas = reservas.filter((reserva: Reserva) => {
@@ -570,7 +621,128 @@ const AdminReservasDashboard = () => {
         >
           Gestión de reservas
         </button>
+        <button
+          className={`px-3 sm:px-4 py-2 rounded-lg font-semibold text-sm sm:text-base ${activeTab === "reglas" ? "bg-blue-600 text-white" : "bg-white text-blue-600 border border-blue-600"}`}
+          onClick={() => setActiveTab("reglas")}
+        >
+          Reglas de Reprogramación
+        </button>
       </div>
+      {/* Vista de reglas de reprogramación */}
+      {activeTab === "reglas" && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Reglas de Reprogramación</h2>
+            <button
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              onClick={() => { setEditingRegla(null); setShowReglaModal(true); }}
+            >
+              Nueva Regla
+            </button>
+          </div>
+          {loadingReglas ? (
+            <div className="text-gray-600">Cargando reglas...</div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200 text-xs md:text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Aplica a</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Activa</th>
+                  <th className="px-4 py-2 text-left font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {reglas.map((regla) => (
+                  <tr key={regla.id}>
+                    <td className="px-4 py-2">{regla.nombre}</td>
+                    <td className="px-4 py-2">{regla.descripcion}</td>
+                    <td className="px-4 py-2">{regla.aplicable_a}</td>
+                    <td className="px-4 py-2">{regla.tipo_regla}</td>
+                    <td className="px-4 py-2">{regla.valor_numerico}</td>
+                    <td className="px-4 py-2">{regla.activa ? "Sí" : "No"}</td>
+                    <td className="px-4 py-2 flex gap-2">
+                      <button className="text-green-600 hover:text-green-900" onClick={() => { setEditingRegla(regla); setShowReglaModal(true); }}>Editar</button>
+                      <button className="text-red-600 hover:text-red-900" onClick={() => eliminarRegla(regla.id)}>Eliminar</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {errorRegla && <div className="text-red-600 mt-4">{errorRegla}</div>}
+        </div>
+      )}
+
+      {/* Modal para crear/editar regla */}
+      {showReglaModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">{editingRegla ? "Editar Regla" : "Nueva Regla"}</h2>
+              <button onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+            </div>
+            <form className="p-6 space-y-4" onSubmit={e => {
+              e.preventDefault();
+              const form = e.target as HTMLFormElement;
+              const data = Object.fromEntries(new FormData(form));
+              if (!data.valor_numerico || isNaN(Number(data.valor_numerico)) || Number(data.valor_numerico) <= 0) {
+                toast({ title: "Valor numérico inválido", description: "Debe ser un número positivo", variant: "destructive" });
+                return;
+              }
+              const payload = {
+                nombre: data.nombre,
+                descripcion: data.descripcion,
+                aplicable_a: data.aplicable_a,
+                tipo_regla: data.tipo_regla,
+                valor_numerico: Number(data.valor_numerico),
+                activa: data.activa === "on"
+              };
+              if (editingRegla) editarRegla(editingRegla.id, payload); else crearRegla(payload);
+            }}>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Nombre</label>
+                <input name="nombre" defaultValue={editingRegla?.nombre || ""} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Descripción</label>
+                <textarea name="descripcion" defaultValue={editingRegla?.descripcion || ""} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Aplica a</label>
+                <select name="aplicable_a" defaultValue={editingRegla?.aplicable_a || "CLIENTE"} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                  <option value="CLIENTE">CLIENTE</option>
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="OPERADOR">OPERADOR</option>
+                  <option value="ALL">TODOS</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Tipo de regla</label>
+                <select name="tipo_regla" defaultValue={editingRegla?.tipo_regla || "LIMITE_REPROGRAMACIONES"} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md">
+                  <option value="LIMITE_REPROGRAMACIONES">Límite de reprogramaciones</option>
+                  <option value="OTRO">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Valor numérico</label>
+                <input name="valor_numerico" type="number" min="1" defaultValue={editingRegla?.valor_numerico || 1} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input name="activa" type="checkbox" defaultChecked={editingRegla?.activa ?? true} className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
+                <label className="text-sm text-gray-700">Activa</label>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => { setShowReglaModal(false); setEditingRegla(null); }} className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancelar</button>
+                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Guardar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Vista Gestión de reservas */}
       {activeTab === "reservas" && (
