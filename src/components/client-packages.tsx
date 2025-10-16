@@ -96,6 +96,8 @@ export default function ClientPackages() {
   const { user } = useAuth()
 
   // Cargar reservas y filtrar solo activos
+
+  // Enriquecer reservas con detalles completos del paquete
   const cargarPaquetes = async () => {
     if (!user) {
       toast({
@@ -108,17 +110,32 @@ export default function ClientPackages() {
     try {
       setLoading(true);
       const reservas = await obtenerMisReservas();
-      // Mostrar todos los paquetes relevantes (pagados, confirmados, completados, reprogramados, en curso, próximos)
       const estadosValidos = [
         'PAGADA', 'PAGADO', 'CONFIRMADA', 'CONFIRMADO', 'COMPLETADA', 'COMPLETADO',
         'REPROGRAMADA', 'EN_CURSO', 'PROXIMO'
       ];
+      // Solo reservas activas
       const activos = reservas.filter((r: any) => estadosValidos.includes((r.estado || '').toUpperCase()));
-      setPackages(activos || []);
-      if (activos && activos.length > 0) {
+      // Enriquecer cada reserva con detalles completos del paquete
+      const enriquecidas = await Promise.all(
+        activos.map(async (r: any) => {
+          if (r.paquete && r.paquete.id) {
+            try {
+              const detalles = await obtenerPaqueteTuristico(r.paquete.id);
+              return { ...r, paquete: { ...r.paquete, ...detalles } };
+            } catch (e) {
+              // Si falla, dejar el paquete como está
+              return r;
+            }
+          }
+          return r;
+        })
+      );
+      setPackages(enriquecidas || []);
+      if (enriquecidas && enriquecidas.length > 0) {
         toast({
           title: "✅ Paquetes activos cargados",
-          description: `Se encontraron ${activos.length} paquetes activos`,
+          description: `Se encontraron ${enriquecidas.length} paquetes activos`,
         });
       }
     } catch (error: any) {
