@@ -72,21 +72,26 @@ const AdminReservasDashboard = () => {
         cliente = `${reserva.usuario.nombres || ''} ${reserva.usuario.apellidos || ''}`.trim();
         clienteEmail = reserva.usuario.email || '';
         telefono = reserva.usuario.telefono || '';
-      } 
-      // Si solo tiene el ID del cliente, intentar obtener más info
+      }
+      // Si tiene cliente anidado (nuevo backend)
+      else if (reserva.cliente && typeof reserva.cliente === 'object') {
+        cliente = `${reserva.cliente.nombre || ''} ${reserva.cliente.apellido || ''}`.trim();
+        clienteEmail = reserva.cliente.email || '';
+        telefono = reserva.cliente.telefono || '';
+      }
+      // Si solo tiene el ID del cliente
       else if (reserva.cliente) {
         cliente = `Cliente ${reserva.cliente}`;
-        // Aquí podrías hacer una llamada a /usuarios/{id}/ si necesitas más detalles
       }
 
       // Intentar obtener visitantes de la reserva
       try {
         const visitantesResponse = await obtenerVisitantesReserva(reserva.id);
         const visitantes = visitantesResponse.data?.results || visitantesResponse.data || [];
-        
+
         if (visitantes.length > 0) {
           numeroPersonas = visitantes.length;
-          
+
           // Buscar el titular para obtener info del cliente
           const titular = visitantes.find((v: any) => v.visitante?.es_titular || v.es_titular);
           if (titular && titular.visitante) {
@@ -113,7 +118,6 @@ const AdminReservasDashboard = () => {
         telefono: telefono,
         numeroPersonas: numeroPersonas,
         tipoServicio: 'Servicio Turístico',
-        // Campos originales del backend para compatibilidad
         usuario: reserva.usuario || null,
         fecha_inicio: reserva.fecha_inicio,
         total: reserva.total,
